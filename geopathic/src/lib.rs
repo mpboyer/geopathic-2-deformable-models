@@ -1,3 +1,2 @@
-pub mod manifold;
-
 pub mod loader;
+pub mod manifold;
