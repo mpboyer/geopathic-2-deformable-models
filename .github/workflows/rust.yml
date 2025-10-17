@@ -21,6 +21,7 @@ jobs:
       working-directory: geopathic
     - name: Run tests
       run: cargo test --verbose
+      working-directory: geopathic
     - name: Run clippy
       run: cargo clippy -- -D warnings
       working-directory: geopathic
