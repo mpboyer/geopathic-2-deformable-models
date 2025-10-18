@@ -23,9 +23,8 @@ pub fn display_manifold(manifold: &Manifold) {
         .collect();
     let faces: Vec<Point3<u16>> = manifold
         .faces
-        .iter()
-        .filter(|&f| f.len() == 3) // only triangles for now
-        .map(|f| Point3::new(f[0] as u16, f[1] as u16, f[2] as u16))
+        .iter() // only triangles for now
+        .map(|f| Point3::new(f.0 as u16, f.1 as u16, f.2 as u16))
         .collect();
 
     let mesh = Mesh::new(coords, faces, None, None, true);
