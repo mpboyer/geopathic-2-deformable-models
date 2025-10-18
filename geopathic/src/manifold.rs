@@ -1,20 +1,24 @@
 //! File containing struct definitions for a memory representation of MANIFolds
 // Will do weird ass things if
 
-use nalgebra::{Const, OVector};
+use nalgebra::DVector;
 use std::collections::HashMap;
 
 /// Generic struct for N-D points.
-pub type Point<const N: usize> = OVector<f64, Const<N>>;
+pub type Point = DVector<f32>;
 
-/// Triangle
-pub type Triangle = (usize, usize, usize);
+/// Polygon
+pub type Polygon = Vec<usize>;
 
 #[derive(Clone, Debug, PartialEq)]
 /// Abstract representation of a manifold.
-pub struct Manifold<const N: usize> {
-    vertices: HashMap<usize, Point<N>>,
-    triangles: Vec<Triangle>,
+pub struct Manifold {
+    pub(crate) vertices: HashMap<usize, Point>,
+    pub(crate) faces: Vec<Polygon>,
 }
 
-impl<const N: usize> Manifold<N> {}
+impl Manifold {
+    pub fn new(vertices: HashMap<usize, Point>, faces: Vec<Polygon>) -> Self {
+        Manifold { vertices, faces }
+    }
+}
