@@ -6,6 +6,7 @@ use crate::manifold::Triangle;
 
 use obj::Obj;
 
+/// Loads a manifold from an OBJ file.
 pub fn load_manifold(file_path: &str) -> Result<Manifold, obj::ObjError> {
     let object = Obj::load(file_path)?;
 
