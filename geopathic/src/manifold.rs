@@ -13,12 +13,12 @@ pub type Triangle = (usize, usize, usize);
 #[derive(Clone, Debug, PartialEq)]
 /// Abstract representation of a manifold.
 pub struct Manifold {
-    pub(crate) vertices: HashMap<usize, Point>,
+    pub(crate) vertices: Vec<Point>,
     pub(crate) faces: Vec<Triangle>,
 }
 
 impl Manifold {
-    pub fn new(vertices: HashMap<usize, Point>, faces: Vec<Triangle>) -> Self {
+    pub fn new(vertices: Vec<Point>, faces: Vec<Triangle>) -> Self {
         Manifold { vertices, faces }
     }
 }
