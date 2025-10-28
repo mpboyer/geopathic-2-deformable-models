@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::manifold::Manifold;
 use crate::manifold::Point;
 use crate::manifold::Triangle;
@@ -13,7 +11,7 @@ pub fn load_manifold(file_path: &str) -> Result<Manifold, obj::ObjError> {
     let mut vertices: Vec<Point> = Vec::new();
     let mut faces: Vec<Triangle> = Vec::new();
 
-    for (i, vertex) in object.data.position.iter().enumerate() {
+    for vertex in object.data.position.iter() {
         vertices.push(Point::from_row_slice(vertex));
     }
 

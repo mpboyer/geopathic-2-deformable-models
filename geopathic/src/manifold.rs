@@ -2,7 +2,6 @@
 // Will do weird ass things if
 
 use nalgebra::DVector;
-use std::collections::HashMap;
 
 /// Generic struct for N-D points.
 pub type Point = DVector<f32>;
