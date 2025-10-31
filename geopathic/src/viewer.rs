@@ -7,7 +7,7 @@ use kiss3d::scene::SceneNode;
 use kiss3d::window::Window;
 use kiss3d::{light::Light, prelude::TextureManager};
 use na::{Point2, Vector3};
-use nalgebra::Point3;
+use nalgebra::{Point3, UnitQuaternion};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,7 +18,7 @@ use crate::manifold::{Manifold, Path};
 
 pub struct Viewer {
     window: Window,
-    mesh_node: Option<SceneNode>,
+    nodes: Vec<SceneNode>,
     camera: ArcBall,
 }
 
@@ -34,7 +34,7 @@ impl Viewer {
 
         Viewer {
             window,
-            mesh_node: None,
+            nodes: Vec::new(),
             camera,
         }
     }
@@ -109,7 +109,7 @@ impl Viewer {
 
         // set the lighting
         self.window.set_light(Light::StickToCamera);
-        self.mesh_node = Some(mesh_node);
+        self.nodes.push(mesh_node);
     }
 
     pub fn draw_path(&mut self, path: &Path, color: Option<Point3<f32>>) {
@@ -124,6 +124,10 @@ impl Viewer {
             path[path.len() - 1][1],
             path[path.len() - 1][2],
         ));
+
+        // add nodes to the viewer to handle rotation
+        self.nodes.push(source);
+        self.nodes.push(target);
 
         for i in 0..path.len() - 1 {
             // extract start and end points of the segment
@@ -147,9 +151,12 @@ impl Viewer {
                 p0[1] + dir[1] / 2.0,
                 p0[2] + dir[2] / 2.0,
             ));
-            let rotation = na::UnitQuaternion::rotation_between(&Vector3::y(), &dir.normalize())
-                .unwrap_or(na::UnitQuaternion::identity());
+            let rotation = UnitQuaternion::rotation_between(&Vector3::y(), &dir.normalize())
+                .unwrap_or(UnitQuaternion::identity());
             line.set_local_rotation(rotation);
+
+            // add to the viewer nodes to handle rotation
+            self.nodes.push(line);
         }
     }
 
@@ -158,11 +165,10 @@ impl Viewer {
         // rotate the object a bit each frame
         while self.window.render_with_camera(&mut self.camera) {
             if rotate {
-                unimplemented!(); // we need to rotate the paths as well
-                // let rotation = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.005);
-                // if let Some(ref mut mesh_node) = self.mesh_node {
-                //     mesh_node.append_rotation(&rotation);
-                // }
+                let rotation = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.005);
+                for segment in &mut self.nodes {
+                    segment.append_rotation(&rotation);
+                }
             }
         }
     }

@@ -15,5 +15,5 @@ fn main() {
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
     viewer.draw_path(&path, None);
-    viewer.render(false);
+    viewer.render(true);
 }
