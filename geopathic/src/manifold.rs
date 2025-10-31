@@ -2,6 +2,7 @@
 // Will do weird ass things if
 
 use nalgebra::DVector;
+use nalgebra::Point3;
 
 /// Generic struct for N-D points.
 pub type Point = DVector<f32>;
@@ -28,4 +29,8 @@ impl Manifold {
     pub fn faces(&self) -> &[Triangle] {
         &self.faces
     }
+}
+
+pub struct Path {
+    pub points: Vec<Point3<f64>>,
 }
