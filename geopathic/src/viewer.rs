@@ -6,7 +6,7 @@ use kiss3d::prelude::Mesh;
 use kiss3d::scene::SceneNode;
 use kiss3d::window::Window;
 use kiss3d::{light::Light, prelude::TextureManager};
-use na::{Point2, UnitQuaternion, Vector3};
+use na::{Point2, Vector3};
 use nalgebra::Point3;
 
 use std::cell::RefCell;
@@ -35,7 +35,7 @@ impl Viewer {
         Viewer {
             window,
             mesh_node: None,
-            camera
+            camera,
         }
     }
 
@@ -113,23 +113,9 @@ impl Viewer {
     }
 
     pub fn draw_path(&mut self, path: &Path, color: Option<Point3<f32>>) {
-        // for i in 0..path.len() - 1 {
-        //     let p0 = &path[i];
-        //     let p1 = &path[i + 1];
-        //     self.window.draw_line(
-        //         &Point3::new(p0[0], p0[1], p0[2]),
-        //         &Point3::new(p1[0], p1[1], p1[2]),
-        //         color.as_ref().unwrap_or(&Point3::new(0.0, 1.0, 0.0)),
-        //     );
-        // }
-
         let mut source = self.window.add_sphere(0.02);
         source.set_color(1.0, 0.0, 0.0); // red marker
-        source.append_translation(&na::Translation3::new(
-            path[0][0],
-            path[0][1],
-            path[0][2],
-        ));
+        source.append_translation(&na::Translation3::new(path[0][0], path[0][1], path[0][2]));
 
         let mut target = self.window.add_sphere(0.02);
         target.set_color(0.0, 1.0, 0.0); // green marker
@@ -138,6 +124,33 @@ impl Viewer {
             path[path.len() - 1][1],
             path[path.len() - 1][2],
         ));
+
+        for i in 0..path.len() - 1 {
+            // extract start and end points of the segment
+            let p0 = &path[i];
+            let p1 = &path[i + 1];
+
+            // add a thin cylinder between p0 and p1
+            let dir = Vector3::new(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
+            let mut line = self.window.add_cylinder(0.005, dir.norm());
+
+            // set the color (argument of default)
+            let (r, g, b) = match color {
+                Some(c) => (c[0], c[1], c[2]),
+                None => (0.0, 0.0, 1.0),
+            };
+            line.set_color(r, g, b);
+
+            // set the position and orientation
+            line.set_local_translation(na::Translation3::new(
+                p0[0] + dir[0] / 2.0,
+                p0[1] + dir[1] / 2.0,
+                p0[2] + dir[2] / 2.0,
+            ));
+            let rotation = na::UnitQuaternion::rotation_between(&Vector3::y(), &dir.normalize())
+                .unwrap_or(na::UnitQuaternion::identity());
+            line.set_local_rotation(rotation);
+        }
     }
 
     /// Launches the render loop.

@@ -5,7 +5,12 @@ use geopathic::viewer::Viewer;
 fn main() {
     let manifold = load_manifold("../examples/models/teapot.obj").unwrap();
     let colormap = vertical_colormap(&manifold);
-    let path = vec![manifold.vertices()[0].clone(), manifold.vertices()[10].clone(), manifold.vertices()[20].clone()];
+    let face = manifold.faces()[100];
+    let path = vec![
+        manifold.vertices()[face.0].clone(),
+        manifold.vertices()[face.1].clone(),
+        manifold.vertices()[face.2].clone(),
+    ];
 
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
