@@ -20,4 +20,12 @@ impl Manifold {
     pub fn new(vertices: Vec<Point>, faces: Vec<Triangle>) -> Self {
         Manifold { vertices, faces }
     }
+
+    pub fn vertices(&self) -> &[Point] {
+        &self.vertices
+    }
+
+    pub fn faces(&self) -> &[Triangle] {
+        &self.faces
+    }
 }
