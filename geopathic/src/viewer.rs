@@ -1,6 +1,7 @@
 extern crate kiss3d;
 extern crate nalgebra as na;
 
+use kiss3d::camera::ArcBall;
 use kiss3d::prelude::Mesh;
 use kiss3d::scene::SceneNode;
 use kiss3d::window::Window;
@@ -13,26 +14,32 @@ use std::rc::Rc;
 
 use image::{DynamicImage, GenericImage};
 
-use crate::manifold::Manifold;
+use crate::manifold::{Manifold, Path};
 
 pub struct Viewer {
     window: Window,
     mesh_node: Option<SceneNode>,
+    camera: ArcBall,
 }
 
 impl Viewer {
     /// Creates a new Viewer instance.
     pub fn new() -> Self {
-        let window = Window::new("Manifold Viewer");
+        let window = Window::new_with_size("Manifold Viewer", 1200, 800);
+
+        // change the default camera position
+        let eye = Point3::new(0.0, 3.0, -7.0);
+        let at = Point3::new(0.0, 1.0, 0.0);
+        let camera = ArcBall::new(eye, at);
+
         Viewer {
             window,
             mesh_node: None,
+            camera
         }
     }
 
     pub fn add_manifold(&mut self, manifold: &Manifold, colormap: Option<Vec<[u8; 4]>>) {
-        let mut window = Window::new("Manifold Viewer");
-
         // add the coordinates of the manifold vertices (with respect to the order in the hashmap)
         let mut base_coords: Vec<Point3<f32>> = Vec::with_capacity(manifold.vertices.len());
         for i in 0..manifold.vertices.len() {
@@ -84,7 +91,7 @@ impl Viewer {
 
         // create a mesh and add it to the window
         let mesh = Rc::new(RefCell::new(mesh));
-        let mut mesh_node = window.add_mesh(mesh, Vector3::new(1.0, 1.0, 1.0));
+        let mut mesh_node = self.window.add_mesh(mesh, Vector3::new(1.0, 1.0, 1.0));
         mesh_node.enable_backface_culling(false);
 
         // add the texture (color per face) or set a default color
@@ -101,16 +108,48 @@ impl Viewer {
         }
 
         // set the lighting
-        window.set_light(Light::StickToCamera);
+        self.window.set_light(Light::StickToCamera);
+        self.mesh_node = Some(mesh_node);
+    }
+
+    pub fn draw_path(&mut self, path: &Path, color: Option<Point3<f32>>) {
+        // for i in 0..path.len() - 1 {
+        //     let p0 = &path[i];
+        //     let p1 = &path[i + 1];
+        //     self.window.draw_line(
+        //         &Point3::new(p0[0], p0[1], p0[2]),
+        //         &Point3::new(p1[0], p1[1], p1[2]),
+        //         color.as_ref().unwrap_or(&Point3::new(0.0, 1.0, 0.0)),
+        //     );
+        // }
+
+        let mut source = self.window.add_sphere(0.02);
+        source.set_color(1.0, 0.0, 0.0); // red marker
+        source.append_translation(&na::Translation3::new(
+            path[0][0],
+            path[0][1],
+            path[0][2],
+        ));
+
+        let mut target = self.window.add_sphere(0.02);
+        target.set_color(0.0, 1.0, 0.0); // green marker
+        target.append_translation(&na::Translation3::new(
+            path[path.len() - 1][0],
+            path[path.len() - 1][1],
+            path[path.len() - 1][2],
+        ));
     }
 
     /// Launches the render loop.
-    pub fn render(&mut self) {
+    pub fn render(&mut self, rotate: bool) {
         // rotate the object a bit each frame
-        let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.005);
-        while self.window.render() {
-            if let Some(ref mut mesh_node) = self.mesh_node {
-                mesh_node.append_rotation(&rot);
+        while self.window.render_with_camera(&mut self.camera) {
+            if rotate {
+                unimplemented!(); // we need to rotate the paths as well
+                // let rotation = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.005);
+                // if let Some(ref mut mesh_node) = self.mesh_node {
+                //     mesh_node.append_rotation(&rotation);
+                // }
             }
         }
     }
