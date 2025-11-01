@@ -43,13 +43,20 @@ fn ich() {
         DVector::from_column_slice(&[-2.58306, 16.091, 2.65485]),
         DVector::from_column_slice(&[-2.94553, 16.2995, 1.58103]),
         DVector::from_column_slice(&[-3.23342, 16.1334, 0.968515]),
-        DVector::from_column_slice(&[-4.14648, 15.5999 ,-0.973337]),
+        DVector::from_column_slice(&[-4.14648, 15.5999, -0.973337]),
     ];
 
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, None);
     viewer.draw_path(&path, Some(5.0), None);
-    viewer.draw_path(&vec![manifold.vertices()[5].clone(), manifold.vertices()[100].clone()], Some(5.0), None);
+    viewer.draw_path(
+        &vec![
+            manifold.vertices()[5].clone(),
+            manifold.vertices()[100].clone(),
+        ],
+        Some(5.0),
+        None,
+    );
     viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
     viewer.render(false);
 }

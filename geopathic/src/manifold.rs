@@ -1,5 +1,4 @@
 //! File containing struct definitions for a memory representation of MANIFolds
-// Will do weird ass things if
 
 use nalgebra::DVector;
 
