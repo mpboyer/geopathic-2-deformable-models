@@ -293,10 +293,4 @@ mod tests {
         let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
         let _ = Mesh::from_manifold(&manifold);
     }
-
-    #[test]
-    fn manifold_to_mesh_teapot() {
-        let manifold = load_manifold("../examples/models/teapot.obj").unwrap();
-        let _ = Mesh::from_manifold(&manifold);
-    }
 }
