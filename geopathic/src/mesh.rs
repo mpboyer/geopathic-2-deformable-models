@@ -28,13 +28,22 @@ pub struct Edge {
     pub(crate) length: f64,
 }
 
+/// Face of a mesh
+#[derive(Debug, Clone, PartialEq)]
+pub struct Face {
+    /// Indices of the vertices forming the face
+    pub(crate) vertices: [usize; 3],
+    /// Indices of the edges forming the face
+    pub(crate) edges: [usize; 3],
+}
+
 /// Mesh, containing vertices, edge and faces
 #[derive(Debug, Clone, PartialEq)]
 pub struct Mesh {
     pub(crate) vertices: Vec<Vertex>,
     pub(crate) edges: Vec<Edge>,
     /// List of faces, each defined by a triplet of vertex indices
-    pub(crate) faces: Vec<[usize; 3]>,
+    pub(crate) faces: Vec<Face>,
     /// Precomputed sum of angles of each vertex
     pub(crate) angles: Vec<f64>,
 }
@@ -44,7 +53,7 @@ impl Mesh {
     pub fn from_manifold(manifold: &manifold::Manifold) -> Self {
         let mut vertices = Vec::new();
         let mut edges: Vec<Edge> = Vec::new();
-        let mut faces = Vec::new();
+        let mut faces: Vec<Face> = Vec::new();
         let mut angles = vec![0.0; manifold.faces().len()];
 
         // Iterate over the vertices in the manifold
@@ -58,14 +67,17 @@ impl Mesh {
 
         // Iterate over the faces in the manifold
         for f in &manifold.faces {
-            faces.push([f.0, f.1, f.2]);
+            faces.push(Face {
+                vertices: [f.0, f.1, f.2],
+                edges: [0; 3],
+            });
         }
 
         // Compute the edges
         for face in &faces {
-            let v0 = &vertices[face[0]].position;
-            let v1 = &vertices[face[1]].position;
-            let v2 = &vertices[face[2]].position;
+            let v0 = &vertices[face.vertices[0]].position;
+            let v1 = &vertices[face.vertices[1]].position;
+            let v2 = &vertices[face.vertices[2]].position;
 
             let edge_lengths = [(v1 - v0).norm(), (v2 - v1).norm(), (v0 - v2).norm()];
 
@@ -73,8 +85,8 @@ impl Mesh {
             let edge_indices = [edges.len(), edges.len() + 1, edges.len() + 2];
 
             for i in 0..3 {
-                let start = face[i];
-                let end = face[(i + 1) % 3];
+                let start = face.vertices[i];
+                let end = face.vertices[(i + 1) % 3];
                 let next_edge = edge_indices[(i + 1) % 3];
 
                 edges.push(Edge {
@@ -98,34 +110,26 @@ impl Mesh {
             }
         }
 
-        // Compute angles at each vertex (see code above)
-        for (i, face) in faces.iter().enumerate() {
+        // Compute the faces' edge indices
+        let mut edge_offset = 0;
+        for face in &mut faces {
             for j in 0..3 {
-                let cur_vert = face[j];
+                face.edges[j] = edge_offset;
+                edge_offset += 1;
+            }
+        }
 
-                // TODO: precompute this in the faces
+        // Compute angles at each vertex (see code above)
+        for face in &faces {
+            for j in 0..3 {
+                let cur_vert = face.vertices[j];
 
-                // Find the edge from cur_vert to the next vertex in the face
-                let edge0_idx = vertices[cur_vert]
-                    .edges
-                    .iter()
-                    .find(|&&e_idx| edges[e_idx].end == face[(j + 1) % 3])
-                    .copied()
-                    .expect("Edge not found");
-                let edge0 = edges[edge0_idx].length;
+                let edge0 = edges[face.edges[j]].length;
+                let edge1 = edges[face.edges[(j + 2) % 3]].length;
 
-                // Find the edge from cur_vert to the previous vertex in the face
-                let edge1_idx = vertices[cur_vert]
-                    .edges
-                    .iter()
-                    .find(|&&e_idx| edges[e_idx].end == face[(j + 2) % 3])
-                    .copied()
-                    .expect("Edge not found");
-                let edge1 = edges[edge1_idx].length;
-
-                let vec0 = vertices[cur_vert].position;
-                let vec1 = vertices[face[(j + 1) % 3]].position;
-                let vec2 = vertices[face[(j + 2) % 3]].position;
+                // let vec0 = vertices[cur_vert].position;
+                let vec1 = vertices[face.vertices[(j + 1) % 3]].position;
+                let vec2 = vertices[face.vertices[(j + 2) % 3]].position;
 
                 let edge2 = (vec1 - vec2).norm();
 
@@ -134,20 +138,6 @@ impl Mesh {
                     .acos();
                 // TODO: handle concave angles properly if necessary
                 angles[cur_vert] += cur_angle;
-                if i == 1 && j == 2 {
-                    // print everything
-                    eprintln!("Face {} Vertex {} ({:?})", i, j, face);
-                    eprintln!("Vertex indices: {}, {}, {}", face[j], face[(j+1) % 3], face[(j+2) % 3]);
-                    eprintln!(
-                        "edge0: {}, edge1: {}, edge2: {}",
-                        edge0, edge1, edge2
-                    );
-                    eprintln!(
-                        "vec0: ({}, {}, {}), vec1: ({}, {}, {}), vec2: ({}, {}, {})",
-                        vec0.x, vec0.y, vec0.z, vec1.x, vec1.y, vec1.z, vec2.x, vec2.y, vec2.z
-                    );
-                    // eprintln!("i: {}, j: {}, angle: {}", i, j, cur_angle);
-                }
             }
         }
 
@@ -276,7 +266,7 @@ mod tests {
                     length: f64::sqrt(2.0),
                 },
             ],
-            faces: vec![[0, 1, 2], [0, 2, 3], [0, 3, 1], [1, 3, 2]],
+            faces: vec![Face { vertices: [0, 1, 2], edges: [0, 1, 2] }, Face { vertices: [0, 2, 3], edges: [3, 4, 5] }, Face { vertices: [0, 3, 1], edges: [6, 7, 8] }, Face { vertices: [1, 3, 2], edges: [9, 10, 11] }],
             angles: vec![4.71238898, 2.617993878, 2.617993878, 2.617993878],
         };
 
