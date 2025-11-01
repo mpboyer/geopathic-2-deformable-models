@@ -17,9 +17,9 @@ use image::{DynamicImage, GenericImage};
 use crate::manifold::{Manifold, Path};
 
 pub struct Viewer {
-    window: Window,
-    nodes: Vec<SceneNode>,
-    camera: ArcBall,
+    pub window: Window,
+    pub nodes: Vec<SceneNode>,
+    pub camera: ArcBall,
 }
 
 impl Viewer {
@@ -28,7 +28,7 @@ impl Viewer {
         let window = Window::new_with_size("Manifold Viewer", 1200, 800);
 
         // change the default camera position
-        let eye = Point3::new(0.0, 3.0, -7.0);
+        let eye = Point3::new(0.0, 3.0, 7.0);
         let at = Point3::new(0.0, 1.0, 0.0);
         let camera = ArcBall::new(eye, at);
 
@@ -112,12 +112,13 @@ impl Viewer {
         self.nodes.push(mesh_node);
     }
 
-    pub fn draw_path(&mut self, path: &Path, color: Option<Point3<f32>>) {
-        let mut source = self.window.add_sphere(0.02);
+    pub fn draw_path(&mut self, path: &Path, scale: Option<f32>, color: Option<Point3<f32>>) {
+        let scale = scale.unwrap_or(1.0);
+        let mut source = self.window.add_sphere(0.02 * scale);
         source.set_color(1.0, 0.0, 0.0); // red marker
         source.append_translation(&na::Translation3::new(path[0][0], path[0][1], path[0][2]));
 
-        let mut target = self.window.add_sphere(0.02);
+        let mut target = self.window.add_sphere(0.02 * scale);
         target.set_color(0.0, 1.0, 0.0); // green marker
         target.append_translation(&na::Translation3::new(
             path[path.len() - 1][0],
@@ -136,7 +137,7 @@ impl Viewer {
 
             // add a thin cylinder between p0 and p1
             let dir = Vector3::new(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
-            let mut line = self.window.add_cylinder(0.005, dir.norm());
+            let mut line = self.window.add_cylinder(0.005 * scale, dir.norm());
 
             // set the color (argument of default)
             let (r, g, b) = match color {
