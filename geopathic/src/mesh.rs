@@ -148,6 +148,15 @@ impl Mesh {
             angles,
         }
     }
+
+    pub fn edges_of_vertex(&self, vertex_index: usize) -> Vec<&Edge> {
+        let vertex = &self.vertices[vertex_index];
+        vertex
+            .edges
+            .iter()
+            .map(|&edge_index| &self.edges[edge_index])
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -266,7 +275,24 @@ mod tests {
                     length: f64::sqrt(2.0),
                 },
             ],
-            faces: vec![Face { vertices: [0, 1, 2], edges: [0, 1, 2] }, Face { vertices: [0, 2, 3], edges: [3, 4, 5] }, Face { vertices: [0, 3, 1], edges: [6, 7, 8] }, Face { vertices: [1, 3, 2], edges: [9, 10, 11] }],
+            faces: vec![
+                Face {
+                    vertices: [0, 1, 2],
+                    edges: [0, 1, 2],
+                },
+                Face {
+                    vertices: [0, 2, 3],
+                    edges: [3, 4, 5],
+                },
+                Face {
+                    vertices: [0, 3, 1],
+                    edges: [6, 7, 8],
+                },
+                Face {
+                    vertices: [1, 3, 2],
+                    edges: [9, 10, 11],
+                },
+            ],
             angles: vec![4.71238898, 2.617993878, 2.617993878, 2.617993878],
         };
 
