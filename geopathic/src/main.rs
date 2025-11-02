@@ -4,8 +4,8 @@ use geopathic::colormaps::{distance_colormap, iso_distances};
 use geopathic::edp::HeatMethod;
 use geopathic::ich::ICH;
 use geopathic::loader::load_manifold;
+use geopathic::mesh::Mesh;
 use geopathic::viewer::Viewer;
-use geopathic::{colormaps::distance_colormap, mesh::Mesh};
 // use kiss3d::camera::ArcBall;
 // use nalgebra::{DVector, Point3};
 
