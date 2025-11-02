@@ -131,9 +131,9 @@ impl Eq for Window {}
 impl Ord for Window {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         if self.min_distance > other.min_distance {
-            std::cmp::Ordering::Greater
-        } else {
             std::cmp::Ordering::Less
+        } else {
+            std::cmp::Ordering::Greater
         }
     }
 }
@@ -160,9 +160,9 @@ impl Eq for PseudoWindow {}
 impl Ord for PseudoWindow {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         if self.distance < other.distance {
-            std::cmp::Ordering::Greater
-        } else {
             std::cmp::Ordering::Less
+        } else {
+            std::cmp::Ordering::Greater
         }
     }
 }
@@ -277,6 +277,10 @@ impl ICH {
                 self.generate_sub_windows(&pseudo_win);
             }
         }
+    }
+
+    pub fn print_stats(&self) {
+        println!("{:#?}", self.stats);
     }
 }
 
@@ -394,6 +398,7 @@ impl ICH {
     }
 
     fn propagate_window(&mut self, window: &Window) {
+        self.stats.window_propagated();
         // extract the three edges of the face opposite to the window's edge
         let e0 = self.mesh.edges[window.edge].twin_edge;
         let e0 = match e0 {
@@ -967,5 +972,28 @@ mod tests {
         ich.init();
 
         assert_eq!(ich.stats.windows_created, 43);
+    }
+
+    #[test]
+    fn test_queue_ordering() {
+        let mut heap = BinaryHeap::new();
+
+        let mut win1 = Window::new(0, 0.0, 1.0, 1.0, 1.0, 0.0, 0, 0);
+        win1.min_distance = 2.0;
+        let mut win2 = Window::new(1, 0.0, 1.0, 1.0, 1.0, 0.0, 0, 0);
+        win2.min_distance = 3.0;
+        let mut win3 = Window::new(2, 0.0, 1.0, 1.0, 1.0, 0.0, 0, 0);
+        win3.min_distance = 1.0;
+
+        heap.push(win1);
+        heap.push(win2);
+        heap.push(win3);
+
+        let first = heap.pop().unwrap();
+        let second = heap.pop().unwrap();
+        let third = heap.pop().unwrap();
+
+        assert!(first.min_distance <= second.min_distance);
+        assert!(second.min_distance <= third.min_distance);
     }
 }
