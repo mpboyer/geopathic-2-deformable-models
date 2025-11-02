@@ -1,9 +1,10 @@
 //! Implementation of the Improved Chen-Han (ICH) algorithm for pathfinding.
 
-use nalgebra::Point3;
+use crate::mesh::{Mesh, dist};
+use nalgebra::{Point2, Point3};
 use std::collections::BinaryHeap;
 
-use crate::mesh::{Mesh, dist};
+const RELATIVE_ERROR: f64 = 1e-6;
 
 #[derive(Debug, Clone)]
 struct Window {
@@ -61,6 +62,18 @@ impl Window {
         win
     }
 
+    pub fn build(
+        parent: &Window,
+        edge: usize,
+        t0: f64,
+        t1: f64,
+        v_start: Point2<f64>,
+        v_end: Point2<f64>,
+    ) -> Self {
+        unimplemented!()
+    }
+
+    /// Computes the minimum distance within the window.
     fn compute_min_distance(&mut self) {
         let tau = self.b1 - self.b0;
         let x_projection = (self.d0.powi(2) - self.d1.powi(2) + tau.powi(2)) / (2.0 * tau);
@@ -72,6 +85,14 @@ impl Window {
             let y_projection = f64::sqrt(self.d0.powi(2) - x_projection.powi(2));
             self.min_distance = y_projection + self.sigma;
         }
+    }
+
+    /// Flattens the source point onto a 2D plane for calculations.
+    pub fn flatten_source(&self) -> Point2<f64> {
+        let tau = self.b1 - self.b0;
+        let x_projection = (self.d0.powi(2) - self.d1.powi(2) + tau.powi(2)) / (2.0 * tau);
+        let y_projection = f64::sqrt((self.d0.powi(2) - x_projection.powi(2)).abs());
+        Point2::new(x_projection + self.b0, y_projection)
     }
 }
 
@@ -215,11 +236,11 @@ impl ICH {
                 if let Some(twin_edge_id) = self.mesh.edges[win.edge].twin_edge {
                     let twin_edge = &self.mesh.edges[twin_edge_id];
                     if self.kept_faces.contains(&twin_edge.face) {
-                        self.stored_windows.push(win);
+                        self.stored_windows.push(win.clone());
                     }
                 }
 
-                self.propagate_window(self.stored_windows.last().unwrap());
+                self.propagate_window(&win);
             }
             // else if there is a pseudo window with smaller distance than the smallest window min_distance, generate sub-windows from it
             else if !self.pseudo_source_queue.is_empty()
@@ -350,12 +371,153 @@ impl ICH {
         }
     }
 
-    fn propagate_window(&self, window: &Window) {
+    fn propagate_window(&mut self, window: &Window) {
+        // extract the three edges of the face opposite to the window's edge
+        let e0 = self.mesh.edges[window.edge].twin_edge;
+        let e0 = match e0 {
+            Some(id) => id,
+            None => return,
+        };
+        let e1 = self.mesh.edges[e0].next_edge;
+        let e2 = self.mesh.edges[e1].next_edge;
+
+        // flatten the source point of the window
+        let source_2d = window.flatten_source();
+
+        //
+        let left = Point2::new(window.b0, 0.0);
+        let right = Point2::new(window.b1, 0.0);
+        let l0 = self.mesh.edges[e0].length;
+        let l1 = self.mesh.edges[e1].length;
+        let l2 = self.mesh.edges[e2].length;
+        let v0 = Point2::new(0.0, 0.0);
+        let v1 = Point2::new(l1, 0.0);
+        let x = (l1.powi(2) + l0.powi(2) - l2.powi(2)) / (2.0 * l0);
+        let v2 = Point2::new(x, -f64::sqrt((l1.powi(2) - x.powi(2)).abs()));
+
+        let inter_x = v2.x - v2.y * (v2.x - source_2d.x) / (v2.y - source_2d.y);
+
+        // only right child window
+        let (left_win, right_win) = if inter_x <= left.x {
+            // compute the window
+            let t0 = self.intersect(source_2d, left, v2, v1);
+            let t1 = self.intersect(source_2d, right, v2, v1);
+            let right_win = Window::build(window, e2, t0, t1, v2, v1);
+
+            // check if it is valid
+            let right_win = if self.is_valid_window(window, false) {
+                Some(right_win)
+            } else {
+                None
+            };
+
+            // return only right window
+            (None, right_win)
+        }
+        // only left child window
+        else if inter_x >= right.x {
+            // compute the window
+            let t0 = self.intersect(source_2d, left, v2, v1);
+            let t1 = self.intersect(source_2d, right, v2, v1);
+            let left_win = Window::build(window, e1, t0, t1, v0, v2);
+
+            // check if it is valid
+            let left_win = if self.is_valid_window(window, true) {
+                Some(left_win)
+            } else {
+                None
+            };
+
+            // return only left window
+            (left_win, None)
+        }
+        // both child windows
+        else {
+            let opposite_vertex = self.mesh.edges[e1].end;
+
+            (None, None)
+        };
+
+        if let Some(win) = left_win {
+            self.window_queue.push(win);
+            self.stats.window_created();
+        }
+        if let Some(win) = right_win {
+            self.window_queue.push(win);
+            self.stats.window_created();
+        }
+    }
+
+    /// Generates sub-windows from a pseudo window.
+    fn generate_sub_windows(&self, pseudo_window: &PseudoWindow) {
         unimplemented!()
     }
 
-    fn generate_sub_windows(&self, pseudo_window: &PseudoWindow) {
-        unimplemented!()
+    /// Computes the intersection point between two lines defined by points.
+    fn intersect(&self, v0: Point2<f64>, v1: Point2<f64>, p0: Point2<f64>, p1: Point2<f64>) -> f64 {
+        let a00 = p0.x - p1.x;
+        let a01 = v1.x - v0.x;
+        let a10 = p0.y - p1.y;
+        let a11 = v1.y - v0.y;
+        let b0 = v1.x - p1.x;
+        let b1 = v1.y - p1.y;
+
+        let det = a00 * a11 - a01 * a10;
+        (b0 * a11 - b1 * a01) / det
+    }
+
+    /// Checks if a window is valid based on ICH's filters.
+    fn is_valid_window(&self, window: &Window, is_left: bool) -> bool {
+        // degenerate window
+        if window.b1 <= window.b0 {
+            return false;
+        }
+
+        // vertices
+        let v1 = self.mesh.edges[window.edge].start;
+        let v2 = self.mesh.edges[window.edge].end;
+        let v3 = self.mesh.edges[self.mesh.edges[window.edge].next_edge].end;
+
+        // lengths of the edges
+        let l0 = self.mesh.edges[window.edge].length;
+        let l1 = self.mesh.edges[self.mesh.edges[window.edge].next_edge].length;
+        let l2 = self.mesh.edges[self.mesh.edges[self.mesh.edges[window.edge].next_edge].next_edge]
+            .length;
+
+        // compute point p3 in 2D
+        let x = (l2.powi(2) + l0.powi(2) - l1.powi(2)) / (2.0 * l0);
+        let p3 = Point2::new(x, f64::sqrt((l1.powi(2) - x.powi(2)).abs()));
+
+        // window points in 2D
+        let a = Point2::new(window.b0, 0.0);
+        let b = Point2::new(window.b1, 0.0);
+        let src_2d = window.flatten_source();
+
+        // precompute some distances
+        let s_a = window.sigma + (src_2d - a).norm();
+        let s_b = window.sigma + (src_2d - b).norm();
+        let p3_a = self.vertex_infos[v3].distance + (p3 - a).norm();
+        let p3_b = self.vertex_infos[v3].distance + (p3 - b).norm();
+
+        // apply the filters
+        if s_b > self.vertex_infos[v1].distance + window.b1
+            && s_b / (self.vertex_infos[v1].distance + window.b1) - 1.0 > 0.0
+        {
+            return false;
+        }
+        if s_a > self.vertex_infos[v2].distance + (l0 - window.b0)
+            && s_a / (self.vertex_infos[v2].distance + (l0 - window.b0)) - 1.0 > 0.0
+        {
+            return false;
+        }
+        if is_left && s_a > p3_a && s_a / p3_a - 1.0 > 0.0 {
+            return false;
+        }
+        if !is_left && s_b > p3_b && s_b / p3_b - 1.0 > RELATIVE_ERROR {
+            return false;
+        }
+
+        true
     }
 }
 
