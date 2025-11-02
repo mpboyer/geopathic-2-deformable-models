@@ -508,7 +508,80 @@ impl ICH {
     }
 
     /// Generates sub-windows from a pseudo window.
-    fn generate_sub_windows(&self, pseudo_window: &PseudoWindow) {
+    fn generate_sub_windows(&mut self, pseudo_window: &PseudoWindow) {
+        let (mut start_edge, end_edge) = if self.vertex_infos[pseudo_window.vertex].enter_edge.is_none() && self.vertex_infos[pseudo_window.vertex].birth_time.is_none() {
+            let start = self.mesh.vertices[pseudo_window.vertex].edges[0];
+            (start, start)
+        } else if self.mesh.edges[self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap()].start == pseudo_window.vertex {
+            self.pseudo_source_sub_windows(pseudo_window)
+        } else if self.mesh.edges[self.mesh.edges[self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap()].next_edge].end == pseudo_window.vertex {
+            self.window_sub_windows(pseudo_window)
+        } else {
+            unreachable!();
+        };
+
+        // generate all the subwindows
+        loop {
+            let next_edge = self.mesh.edges[start_edge].next_edge;
+            let next_next_edge = self.mesh.edges[next_edge].next_edge;
+            let mut win = Window::new(
+                next_edge,
+                0.0,
+                self.mesh.edges[next_edge].length,
+                self.mesh.edges[start_edge].length,
+                self.mesh.edges[next_next_edge].length,
+                pseudo_window.distance,
+                pseudo_window.s,
+                pseudo_window.vertex,
+            );
+            win.birth_time = pseudo_window.birth_time;
+            win.level = pseudo_window.level + 1;
+            
+            self.window_queue.push(win);
+            self.stats.window_created();
+
+            start_edge = self.mesh.edges[next_next_edge].twin_edge.unwrap();
+            if start_edge == end_edge {
+                break;
+            }
+        }
+        
+        // generate the adjacent pseudo windows
+        for adjacent_edge in self.mesh.edges_of_vertex(pseudo_window.vertex) {
+            let opposite_vertex = adjacent_edge.end;
+            
+            if self.mesh.angles[opposite_vertex] < 2.0 * std::f64::consts::PI || self.vertex_infos[opposite_vertex].distance < pseudo_window.distance + adjacent_edge.length {
+                continue;
+            }
+
+            // update vertex info
+            self.vertex_infos[opposite_vertex].distance = pseudo_window.distance + adjacent_edge.length;
+            self.vertex_infos[opposite_vertex].birth_time = match pseudo_window.birth_time {
+                Some(t) => Some(t + 1),
+                None => Some(0),
+            };
+            self.vertex_infos[opposite_vertex].enter_edge = adjacent_edge.twin_edge;
+            self.vertex_infos[opposite_vertex].s = Some(pseudo_window.s);
+            self.vertex_infos[opposite_vertex].p = Some(pseudo_window.p);
+
+            // create new pseudo window
+            let child_pseudo_win = PseudoWindow {
+                vertex: opposite_vertex,
+                distance: self.vertex_infos[opposite_vertex].distance,
+                s: pseudo_window.s,
+                p: pseudo_window.p,
+                birth_time: self.vertex_infos[opposite_vertex].birth_time,
+                level: pseudo_window.level,
+            };
+            self.pseudo_source_queue.push(child_pseudo_win);
+        }
+    }
+
+    fn pseudo_source_sub_windows(&self, pseudo_window: &PseudoWindow) -> (usize, usize) {
+        unimplemented!()
+    }
+
+    fn window_sub_windows(&self, pseudo_window: &PseudoWindow) -> (usize, usize) {
         unimplemented!()
     }
 
