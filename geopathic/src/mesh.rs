@@ -26,6 +26,8 @@ pub struct Edge {
     pub(crate) twin_edge: Option<usize>,
     /// Length of the edge
     pub(crate) length: f64,
+    /// Face associated with the edge
+    pub(crate) face: usize,
 }
 
 /// Face of a mesh
@@ -74,7 +76,7 @@ impl Mesh {
         }
 
         // Compute the edges
-        for face in &faces {
+        for (face_id, face) in faces.iter().enumerate() {
             let v0 = &vertices[face.vertices[0]].position;
             let v1 = &vertices[face.vertices[1]].position;
             let v2 = &vertices[face.vertices[2]].position;
@@ -95,6 +97,7 @@ impl Mesh {
                     next_edge,
                     twin_edge: None,
                     length: edge_lengths[i],
+                    face: face_id,
                 });
 
                 vertices[start].edges.push(edge_indices[i]);
@@ -201,6 +204,7 @@ mod tests {
                     next_edge: 1,
                     twin_edge: Some(8),
                     length: 1.0,
+                    face: 0,
                 },
                 Edge {
                     start: 1,
@@ -208,6 +212,7 @@ mod tests {
                     next_edge: 2,
                     twin_edge: Some(11),
                     length: f64::sqrt(2.0),
+                    face: 0,
                 },
                 Edge {
                     start: 2,
@@ -215,6 +220,7 @@ mod tests {
                     next_edge: 0,
                     twin_edge: Some(3),
                     length: 1.0,
+                    face: 0,
                 },
                 Edge {
                     start: 0,
@@ -222,6 +228,7 @@ mod tests {
                     next_edge: 4,
                     twin_edge: Some(2),
                     length: 1.0,
+                    face: 1,
                 },
                 Edge {
                     start: 2,
@@ -229,6 +236,7 @@ mod tests {
                     next_edge: 5,
                     twin_edge: Some(10),
                     length: f64::sqrt(2.0),
+                    face: 1,
                 },
                 Edge {
                     start: 3,
@@ -236,6 +244,7 @@ mod tests {
                     next_edge: 3,
                     twin_edge: Some(6),
                     length: 1.0,
+                    face: 1,
                 },
                 Edge {
                     start: 0,
@@ -243,6 +252,7 @@ mod tests {
                     next_edge: 7,
                     twin_edge: Some(5),
                     length: 1.0,
+                    face: 2,
                 },
                 Edge {
                     start: 3,
@@ -250,6 +260,7 @@ mod tests {
                     next_edge: 8,
                     twin_edge: Some(9),
                     length: f64::sqrt(2.0),
+                    face: 2,
                 },
                 Edge {
                     start: 1,
@@ -257,6 +268,7 @@ mod tests {
                     next_edge: 6,
                     twin_edge: Some(0),
                     length: 1.0,
+                    face: 2,
                 },
                 Edge {
                     start: 1,
@@ -264,6 +276,7 @@ mod tests {
                     next_edge: 10,
                     twin_edge: Some(7),
                     length: f64::sqrt(2.0),
+                    face: 3,
                 },
                 Edge {
                     start: 3,
@@ -271,6 +284,7 @@ mod tests {
                     next_edge: 11,
                     twin_edge: Some(4),
                     length: f64::sqrt(2.0),
+                    face: 3,
                 },
                 Edge {
                     start: 2,
@@ -278,6 +292,7 @@ mod tests {
                     next_edge: 9,
                     twin_edge: Some(1),
                     length: f64::sqrt(2.0),
+                    face: 3,
                 },
             ],
             faces: vec![

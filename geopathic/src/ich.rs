@@ -133,6 +133,7 @@ pub struct ICH {
     source_vertices: Vec<usize>,
     source_points: Vec<(usize, Point3<f64>)>,
     kept_faces: Vec<usize>,
+    stored_windows: Vec<Window>,
     window_queue: BinaryHeap<Window>,
     pseudo_source_queue: BinaryHeap<PseudoWindow>,
     stats: ICHStats,
@@ -153,6 +154,7 @@ impl ICH {
             source_vertices,
             source_points,
             kept_faces,
+            stored_windows: Vec::new(),
             window_queue: BinaryHeap::new(),
             pseudo_source_queue: BinaryHeap::new(),
             stats: ICHStats::default(),
@@ -163,7 +165,60 @@ impl ICH {
     /// Runs the ICH algorithm.
     pub fn run(&mut self) {
         self.init();
-        unimplemented!()
+
+        while !self.window_queue.is_empty() || !self.pseudo_source_queue.is_empty() {
+            self.stats.update_max_queue_size(self.window_queue.len());
+            self.stats
+                .update_max_pseudo_queue_size(self.pseudo_source_queue.len());
+
+            // remove invalid windows, that is, whose birth time is not equal than the current one
+            while let Some(win) = self.window_queue.peek() {
+                if win.birth_time != self.vertex_infos[win.p].birth_time {
+                    self.window_queue.pop();
+                } else {
+                    break;
+                }
+            }
+
+            // remove invalid pseudo windows
+            while let Some(pseudo_win) = self.pseudo_source_queue.peek() {
+                if pseudo_win.birth_time != self.vertex_infos[pseudo_win.vertex].birth_time {
+                    self.pseudo_source_queue.pop();
+                } else {
+                    break;
+                }
+            }
+
+            if !self.window_queue.is_empty()
+                && (self.pseudo_source_queue.is_empty()
+                    || self.window_queue.peek().unwrap().min_distance
+                        <= self.pseudo_source_queue.peek().unwrap().distance)
+            {
+                let win = self.window_queue.pop().unwrap();
+                if win.level > self.mesh.faces.len() {
+                    continue;
+                }
+
+                if let Some(twin_edge_id) = self.mesh.edges[win.edge].twin_edge {
+                    let twin_edge = &self.mesh.edges[twin_edge_id];
+                    if self.kept_faces.contains(&twin_edge.face) {
+                        self.stored_windows.push(win);
+                    }
+                }
+
+                self.propagate_window(self.stored_windows.last().unwrap());
+            } else if !self.pseudo_source_queue.is_empty()
+                && (self.window_queue.is_empty()
+                    || self.window_queue.peek().unwrap().min_distance
+                        >= self.pseudo_source_queue.peek().unwrap().distance)
+            {
+                let pseudo_win = self.pseudo_source_queue.pop().unwrap();
+                if pseudo_win.level > self.mesh.faces.len() {
+                    continue;
+                }
+                self.generate_sub_windows(&pseudo_win);
+            }
+        }
     }
 }
 
@@ -272,12 +327,18 @@ impl ICH {
     fn propagate_window(&self, window: &Window) {
         unimplemented!()
     }
+
+    fn generate_sub_windows(&self, pseudo_window: &PseudoWindow) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct ICHStats {
     pub windows_created: usize,
     pub windows_propagated: usize,
+    pub max_queue_size: usize,
+    pub max_pseudo_queue_size: usize,
 }
 
 impl ICHStats {
@@ -287,6 +348,18 @@ impl ICHStats {
 
     pub fn window_propagated(&mut self) {
         self.windows_propagated += 1;
+    }
+
+    pub fn update_max_queue_size(&mut self, size: usize) {
+        if size > self.max_queue_size {
+            self.max_queue_size = size;
+        }
+    }
+
+    pub fn update_max_pseudo_queue_size(&mut self, size: usize) {
+        if size > self.max_pseudo_queue_size {
+            self.max_pseudo_queue_size = size;
+        }
     }
 }
 
