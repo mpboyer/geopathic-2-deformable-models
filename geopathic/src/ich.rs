@@ -576,13 +576,15 @@ impl ICH {
         } else if self.mesh.edges[self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap()].start
             == pseudo_window.vertex
         {
-            self.pseudo_source_sub_windows(pseudo_window)
+            let (start, end) = self.pseudo_source_sub_windows(pseudo_window);
+            (start.unwrap(), end.unwrap())
         } else if self.mesh.edges
             [self.mesh.edges[self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap()].next_edge]
             .end
             == pseudo_window.vertex
         {
-            self.window_sub_windows(pseudo_window)
+            let (start, end) = self.window_sub_windows(pseudo_window);
+            (start.unwrap(), end.unwrap())
         } else {
             unreachable!();
         };
@@ -648,12 +650,142 @@ impl ICH {
         }
     }
 
-    fn pseudo_source_sub_windows(&self, pseudo_window: &PseudoWindow) -> (usize, usize) {
-        unimplemented!()
+    fn pseudo_source_sub_windows(
+        &self,
+        pseudo_window: &PseudoWindow,
+    ) -> (Option<usize>, Option<usize>) {
+        let e0 = self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap();
+        let e1 = self.mesh.edges[e0].next_edge;
+        let e2 = self.mesh.edges[e1].next_edge;
+
+        let l0 = self.mesh.edges[e0].length;
+        let l1 = self.mesh.edges[e1].length;
+        let l2 = self.mesh.edges[e2].length;
+
+        let enter_point = Point2::new(l0 - self.split_infos[e0].x, 0.0);
+
+        let v0 = Point2::new(0.0, 0.0);
+        let v1 = Point2::new(l0, 0.0);
+        let x = (l1.powi(2) + l0.powi(2) - l2.powi(2)) / (2.0 * l0);
+        let v2 = Point2::new(x, -f64::sqrt((l1.powi(2) - x.powi(2)).abs()));
+
+        let mut angle0 = ((enter_point - v2).dot(&(v0 - v2)) / (enter_point - v2).norm() / l1)
+            .clamp(-1.0, 1.0)
+            .acos();
+        let mut angle1 = ((enter_point - v2).dot(&(v1 - v2)) / (enter_point - v2).norm() / l2)
+            .clamp(-1.0, 1.0)
+            .acos();
+
+        let mut start_edge = None;
+        let mut end_edge = None;
+
+        // traverse from the left
+        let mut current_edge_opt = self.mesh.edges[e1].twin_edge;
+        while angle0 < std::f64::consts::PI
+            && let Some(current_edge) = current_edge_opt
+        {
+            let opposite_edge = self.mesh.edges[current_edge].next_edge;
+            let next_edge = self.mesh.edges[opposite_edge].next_edge;
+
+            let l0_bis = self.mesh.edges[current_edge].length;
+            let l1_bis = self.mesh.edges[next_edge].length;
+            let l2_bis = self.mesh.edges[opposite_edge].length;
+
+            let current_angle = ((l0_bis.powi(2) + l1_bis.powi(2) - l2_bis.powi(2))
+                / (2.0 * l0_bis * l1_bis))
+                .clamp(-1.0, 1.0)
+                .acos();
+            angle0 += current_angle;
+            current_edge_opt = self.mesh.edges[next_edge].twin_edge;
+        }
+        if let Some(current_edge) = current_edge_opt {
+            start_edge =
+                Some(self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge);
+        }
+
+        // traverse from the right
+        current_edge_opt = self.mesh.edges[e2].twin_edge;
+        while angle1 < std::f64::consts::PI
+            && let Some(current_edge) = current_edge_opt
+        {
+            let opposite_edge = self.mesh.edges[current_edge].next_edge;
+            let next_edge = self.mesh.edges[opposite_edge].next_edge;
+
+            let l0_bis = self.mesh.edges[current_edge].length;
+            let l1_bis = self.mesh.edges[next_edge].length;
+            let l2_bis = self.mesh.edges[opposite_edge].length;
+
+            let current_angle = ((l0_bis.powi(2) + l1_bis.powi(2) - l2_bis.powi(2))
+                / (2.0 * l0_bis * l1_bis))
+                .clamp(-1.0, 1.0)
+                .acos();
+            angle1 += current_angle;
+            current_edge_opt = self.mesh.edges[next_edge].twin_edge;
+        }
+        if let Some(current_edge) = current_edge_opt {
+            let end_edge_id =
+                self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge;
+            end_edge = self.mesh.edges[end_edge_id].twin_edge;
+        }
+
+        (start_edge, end_edge)
     }
 
-    fn window_sub_windows(&self, pseudo_window: &PseudoWindow) -> (usize, usize) {
-        unimplemented!()
+    fn window_sub_windows(&self, pseudo_window: &PseudoWindow) -> (Option<usize>, Option<usize>) {
+        let mut angle0 = 0.0;
+        let mut angle1 = 0.0;
+
+        let mut start_edge = None;
+        let mut end_edge = None;
+
+        // traverse from the left
+        let mut current_edge_opt = self.vertex_infos[pseudo_window.vertex].enter_edge;
+        while angle0 < std::f64::consts::PI
+            && let Some(current_edge) = current_edge_opt
+        {
+            let opposite_edge = self.mesh.edges[current_edge].next_edge;
+            let next_edge = self.mesh.edges[opposite_edge].next_edge;
+
+            let l0 = self.mesh.edges[current_edge].length;
+            let l1 = self.mesh.edges[next_edge].length;
+            let l2 = self.mesh.edges[opposite_edge].length;
+
+            let current_angle = ((l0.powi(2) + l1.powi(2) - l2.powi(2)) / (2.0 * l0 * l1))
+                .clamp(-1.0, 1.0)
+                .acos();
+            angle0 += current_angle;
+            current_edge_opt = self.mesh.edges[next_edge].twin_edge;
+        }
+        if let Some(current_edge) = current_edge_opt {
+            start_edge =
+                Some(self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge);
+        }
+
+        // traverse from the right
+        current_edge_opt = self.vertex_infos[pseudo_window.vertex].enter_edge;
+        while angle1 < std::f64::consts::PI
+            && let Some(current_edge) = current_edge_opt
+        {
+            let next_edge = self.mesh.edges[current_edge].next_edge;
+            let opposite_edge = self.mesh.edges[next_edge].next_edge;
+
+            let l0 = self.mesh.edges[current_edge].length;
+            let l1 = self.mesh.edges[next_edge].length;
+            let l2 = self.mesh.edges[opposite_edge].length;
+
+            let current_angle = ((l0.powi(2) + l1.powi(2) - l2.powi(2)) / (2.0 * l0 * l1))
+                .clamp(-1.0, 1.0)
+                .acos();
+            angle1 += current_angle;
+            current_edge_opt = self.mesh.edges[next_edge].twin_edge;
+        }
+        if let Some(current_edge) = current_edge_opt {
+            let end_edge_id =
+                self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge;
+            end_edge = self.mesh.edges[end_edge_id].twin_edge;
+        }
+
+        (start_edge, end_edge)
     }
 
     /// Computes the intersection point between two lines defined by points.
