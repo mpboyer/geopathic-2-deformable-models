@@ -1,7 +1,7 @@
 //! Implementation of the Improved Chen-Han (ICH) algorithm for pathfinding.
 
 use crate::mesh::{Mesh, dist};
-use nalgebra::{Point2, Point3};
+use nalgebra::{Point2, Point3, Vector2};
 use std::collections::BinaryHeap;
 
 const RELATIVE_ERROR: f64 = 1e-6;
@@ -65,12 +65,30 @@ impl Window {
     pub fn build(
         parent: &Window,
         edge: usize,
+        edge_length: f64,
         t0: f64,
         t1: f64,
-        v_start: Point2<f64>,
-        v_end: Point2<f64>,
+        v_start: Vector2<f64>,
+        v_end: Vector2<f64>,
     ) -> Self {
-        unimplemented!()
+        let source_2d = parent.flatten_source();
+        let mut win = Window::new(
+            edge,
+            (1.0 - t0) * edge_length,
+            (1.0 - t1) * edge_length,
+            (source_2d - (t0 * v_start + (1.0 - t0) * v_end))
+                .coords
+                .norm(),
+            (source_2d - (t1 * v_start + (1.0 - t1) * v_end))
+                .coords
+                .norm(),
+            parent.sigma,
+            parent.s,
+            parent.p,
+        );
+        win.birth_time = parent.birth_time;
+        win.level = parent.level + 1;
+        win
     }
 
     /// Computes the minimum distance within the window.
@@ -406,7 +424,15 @@ impl ICH {
             // compute the window
             let t0 = self.intersect(source_2d, left, v2, v1);
             let t1 = self.intersect(source_2d, right, v2, v1);
-            let right_win = Window::build(window, e2, t0, t1, v2, v1);
+            let right_win = Window::build(
+                window,
+                e2,
+                self.mesh.edges[e2].length,
+                t0,
+                t1,
+                v2.coords,
+                v1.coords,
+            );
 
             // check if it is valid
             let right_win = if self.is_valid_window(window, false) {
@@ -423,7 +449,15 @@ impl ICH {
             // compute the window
             let t0 = self.intersect(source_2d, left, v2, v1);
             let t1 = self.intersect(source_2d, right, v2, v1);
-            let left_win = Window::build(window, e1, t0, t1, v0, v2);
+            let left_win = Window::build(
+                window,
+                e1,
+                self.mesh.edges[e1].length,
+                t0,
+                t1,
+                v0.coords,
+                v2.coords,
+            );
 
             // check if it is valid
             let left_win = if self.is_valid_window(window, true) {
@@ -441,8 +475,15 @@ impl ICH {
             let direct_distance = (v2 - source_2d).norm();
 
             // "one angle, one split" rule
-            let (build_left, build_right) = if direct_distance + window.sigma > self.split_infos[e0].distance && (direct_distance + window.sigma) / self.split_infos[e0].distance - 1.0 > RELATIVE_ERROR {
-                (self.split_infos[e0].x < inter_x, self.split_infos[e0].x >= inter_x)
+            let (build_left, build_right) = if direct_distance + window.sigma
+                > self.split_infos[e0].distance
+                && (direct_distance + window.sigma) / self.split_infos[e0].distance - 1.0
+                    > RELATIVE_ERROR
+            {
+                (
+                    self.split_infos[e0].x < inter_x,
+                    self.split_infos[e0].x >= inter_x,
+                )
             } else {
                 if direct_distance + window.sigma < self.split_infos[e0].distance {
                     self.split_infos[e0].distance = direct_distance + window.sigma;
@@ -483,13 +524,29 @@ impl ICH {
             // compute the windows
             let left_child = if build_left {
                 let t0 = self.intersect(source_2d, left, v0, v2);
-                Some(Window::build(window, e1, t0, 0.0, v0, v2))
+                Some(Window::build(
+                    window,
+                    e1,
+                    self.mesh.edges[e1].length,
+                    t0,
+                    0.0,
+                    v0.coords,
+                    v2.coords,
+                ))
             } else {
                 None
             };
             let right_child = if build_right {
                 let t1 = self.intersect(source_2d, right, v2, v1);
-                Some(Window::build(window, e2, 0.0, t1, v2, v1))
+                Some(Window::build(
+                    window,
+                    e2,
+                    self.mesh.edges[e2].length,
+                    0.0,
+                    t1,
+                    v2.coords,
+                    v1.coords,
+                ))
             } else {
                 None
             };
@@ -509,12 +566,22 @@ impl ICH {
 
     /// Generates sub-windows from a pseudo window.
     fn generate_sub_windows(&mut self, pseudo_window: &PseudoWindow) {
-        let (mut start_edge, end_edge) = if self.vertex_infos[pseudo_window.vertex].enter_edge.is_none() && self.vertex_infos[pseudo_window.vertex].birth_time.is_none() {
+        let (mut start_edge, end_edge) = if self.vertex_infos[pseudo_window.vertex]
+            .enter_edge
+            .is_none()
+            && self.vertex_infos[pseudo_window.vertex].birth_time.is_none()
+        {
             let start = self.mesh.vertices[pseudo_window.vertex].edges[0];
             (start, start)
-        } else if self.mesh.edges[self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap()].start == pseudo_window.vertex {
+        } else if self.mesh.edges[self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap()].start
+            == pseudo_window.vertex
+        {
             self.pseudo_source_sub_windows(pseudo_window)
-        } else if self.mesh.edges[self.mesh.edges[self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap()].next_edge].end == pseudo_window.vertex {
+        } else if self.mesh.edges
+            [self.mesh.edges[self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap()].next_edge]
+            .end
+            == pseudo_window.vertex
+        {
             self.window_sub_windows(pseudo_window)
         } else {
             unreachable!();
@@ -536,7 +603,7 @@ impl ICH {
             );
             win.birth_time = pseudo_window.birth_time;
             win.level = pseudo_window.level + 1;
-            
+
             self.window_queue.push(win);
             self.stats.window_created();
 
@@ -545,17 +612,21 @@ impl ICH {
                 break;
             }
         }
-        
+
         // generate the adjacent pseudo windows
         for adjacent_edge in self.mesh.edges_of_vertex(pseudo_window.vertex) {
             let opposite_vertex = adjacent_edge.end;
-            
-            if self.mesh.angles[opposite_vertex] < 2.0 * std::f64::consts::PI || self.vertex_infos[opposite_vertex].distance < pseudo_window.distance + adjacent_edge.length {
+
+            if self.mesh.angles[opposite_vertex] < 2.0 * std::f64::consts::PI
+                || self.vertex_infos[opposite_vertex].distance
+                    < pseudo_window.distance + adjacent_edge.length
+            {
                 continue;
             }
 
             // update vertex info
-            self.vertex_infos[opposite_vertex].distance = pseudo_window.distance + adjacent_edge.length;
+            self.vertex_infos[opposite_vertex].distance =
+                pseudo_window.distance + adjacent_edge.length;
             self.vertex_infos[opposite_vertex].birth_time = match pseudo_window.birth_time {
                 Some(t) => Some(t + 1),
                 None => Some(0),
