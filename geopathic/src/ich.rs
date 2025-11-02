@@ -99,6 +99,7 @@ impl Ord for Window {
     }
 }
 
+/// Similar to Window, but for pseudo sources.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PseudoWindow {
     vertex: usize,
@@ -129,14 +130,23 @@ impl Ord for PseudoWindow {
 
 /// Structure representing the ICH algorithm.
 pub struct ICH {
+    /// The mesh on which to run the algorithm.
     mesh: Mesh,
+    /// The vertices to use as sources.
     source_vertices: Vec<usize>,
+    /// The non-vertices points to use as sources (face index and position).
     source_points: Vec<(usize, Point3<f64>)>,
+    /// The faces to keep during the algorithm.
     kept_faces: Vec<usize>,
+    /// The windows stored for distance reconstruction.
     stored_windows: Vec<Window>,
+    /// The window queue for processing.
     window_queue: BinaryHeap<Window>,
+    /// The pseudo source queue for processing.
     pseudo_source_queue: BinaryHeap<PseudoWindow>,
+    /// Statistics collected during the algorithm.
     stats: ICHStats,
+    /// Information about each vertex.
     vertex_infos: Vec<VertexInfo>,
 }
 
@@ -166,6 +176,7 @@ impl ICH {
     pub fn run(&mut self) {
         self.init();
 
+        // main loop: while there are windows or pseudo windows to process
         while !self.window_queue.is_empty() || !self.pseudo_source_queue.is_empty() {
             self.stats.update_max_queue_size(self.window_queue.len());
             self.stats
@@ -189,6 +200,7 @@ impl ICH {
                 }
             }
 
+            // if there is a window with smaller min_distance than the smallest pseudo window distance, propagate it
             if !self.window_queue.is_empty()
                 && (self.pseudo_source_queue.is_empty()
                     || self.window_queue.peek().unwrap().min_distance
@@ -199,6 +211,7 @@ impl ICH {
                     continue;
                 }
 
+                // we save the window to reconstruct the geodesic distances later
                 if let Some(twin_edge_id) = self.mesh.edges[win.edge].twin_edge {
                     let twin_edge = &self.mesh.edges[twin_edge_id];
                     if self.kept_faces.contains(&twin_edge.face) {
@@ -207,7 +220,9 @@ impl ICH {
                 }
 
                 self.propagate_window(self.stored_windows.last().unwrap());
-            } else if !self.pseudo_source_queue.is_empty()
+            }
+            // else if there is a pseudo window with smaller distance than the smallest window min_distance, generate sub-windows from it
+            else if !self.pseudo_source_queue.is_empty()
                 && (self.window_queue.is_empty()
                     || self.window_queue.peek().unwrap().min_distance
                         >= self.pseudo_source_queue.peek().unwrap().distance)
@@ -223,12 +238,15 @@ impl ICH {
 }
 
 impl ICH {
+    /// Initializes the ICH algorithm by creating initial windows from source vertices and points.
     fn init(&mut self) {
+        // create initial windows from source vertices
         for source in &self.source_vertices {
             for edge in self.mesh.edges_of_vertex(*source) {
                 let next_edge_id = edge.next_edge;
                 let next_edge = &self.mesh.edges[next_edge_id];
 
+                // create a new window on the next edge
                 let win = Window::new(
                     next_edge_id,
                     0.0,
@@ -254,6 +272,7 @@ impl ICH {
                         continue;
                     }
 
+                    // create a pseudo window for the opposite vertex
                     let pseudo_win = PseudoWindow {
                         vertex: opposite_vertex_id,
                         distance: edge.length,
@@ -265,6 +284,8 @@ impl ICH {
                     self.pseudo_source_queue.push(pseudo_win);
                 }
             }
+
+            // set source vertex info
             self.vertex_infos[*source].birth_time = 0;
             self.vertex_infos[*source].distance = 0.0;
             self.vertex_infos[*source].enter_edge = usize::MAX;
@@ -273,6 +294,7 @@ impl ICH {
             self.vertex_infos[*source].p = *source;
         }
 
+        // create initial windows from source points (non-vertices)
         for (i, (face_id, position)) in self.source_points.iter().enumerate() {
             for j in 0..3 {
                 let opposite_edge_id = self.mesh.faces[*face_id].edges[j];
@@ -280,6 +302,8 @@ impl ICH {
 
                 // create a new "vertex id" for the source point (which is not a vertex)
                 let source_id = self.mesh.vertices.len() + i;
+
+                // create a new window on the opposite edge
                 let win = Window::new(
                     opposite_edge_id,
                     0.0,
@@ -300,6 +324,7 @@ impl ICH {
                     continue;
                 }
 
+                // set vertex info
                 self.vertex_infos[opposite_vertex_id].birth_time = 0;
                 self.vertex_infos[opposite_vertex_id].distance =
                     dist(position, &self.mesh.vertices[opposite_vertex_id].position);
@@ -311,6 +336,7 @@ impl ICH {
                     continue;
                 }
 
+                // create a pseudo window for the opposite vertex
                 let pseudo_win = PseudoWindow {
                     vertex: opposite_vertex_id,
                     distance: dist(position, &self.mesh.vertices[opposite_vertex_id].position),
@@ -363,6 +389,7 @@ impl ICHStats {
     }
 }
 
+/// Information about each vertex during the ICH algorithm.
 #[derive(Debug, Clone)]
 struct VertexInfo {
     birth_time: usize,
