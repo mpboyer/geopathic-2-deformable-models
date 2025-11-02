@@ -114,12 +114,23 @@ pub fn iso_distances(
 
 impl Viewer {
     pub fn plot_curves(&mut self, paths: Vec<(f32, Path)>) {
-        let color_start = [0xff as f32, 0x00 as f32, 0x00 as f32];
-        let color_end = [0x00 as f32, 0xff as f32, 0x00 as f32];
+        let color_start = [0xff as f32, 0x00 as f32, 0x00 as f32]; // #ff0000
+        let color_end = [0x00 as f32, 0xff as f32, 0x00 as f32]; // #00ff00
 
-        for (t, path) in paths.iter() {
+        let min_dist = paths
+            .iter()
+            .cloned()
+            .fold(f32::INFINITY, |acc, (v, _)| f32::min(v, acc));
+        let max_dist = paths
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, |acc, (v, __)| f32::max(acc, v));
+
+        for (dist, path) in paths.iter() {
             let mut plot = path.clone();
             plot.push(path[0].clone());
+
+            let t = (dist - min_dist) / (max_dist - min_dist);
             let r = color_start[0] + t * (color_end[0] - color_start[0]);
             let g = color_start[1] + t * (color_end[1] - color_start[1]);
             let b = color_start[2] + t * (color_end[2] - color_start[2]);
