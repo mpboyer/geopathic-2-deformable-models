@@ -27,7 +27,7 @@ struct Window {
     /// minimum distance within this window
     min_distance: f64,
     /// birth time of the window
-    birth_time: usize,
+    birth_time: Option<usize>,
     /// level of the window
     level: usize,
 }
@@ -55,7 +55,7 @@ impl Window {
             s,
             p,
             min_distance: 0.0,
-            birth_time: 0,
+            birth_time: Some(0),
             level: 0,
         };
         win.compute_min_distance();
@@ -127,7 +127,7 @@ pub struct PseudoWindow {
     distance: f64,
     s: usize,
     p: usize,
-    birth_time: usize,
+    birth_time: Option<usize>,
     level: usize,
 }
 
@@ -169,6 +169,8 @@ pub struct ICH {
     stats: ICHStats,
     /// Information about each vertex.
     vertex_infos: Vec<VertexInfo>,
+    /// Information for split checks.
+    split_infos: Vec<SplitInfo>,
 }
 
 impl ICH {
@@ -179,7 +181,8 @@ impl ICH {
         source_points: Vec<(usize, Point3<f64>)>,
         kept_faces: Vec<usize>,
     ) -> Self {
-        let len = mesh.vertices.len();
+        let nb_vertices = mesh.vertices.len();
+        let nb_edges = mesh.edges.len();
         ICH {
             mesh,
             source_vertices,
@@ -189,7 +192,8 @@ impl ICH {
             window_queue: BinaryHeap::new(),
             pseudo_source_queue: BinaryHeap::new(),
             stats: ICHStats::default(),
-            vertex_infos: vec![VertexInfo::new(); len],
+            vertex_infos: vec![VertexInfo::new(); nb_vertices],
+            split_infos: vec![SplitInfo::new(); nb_edges],
         }
     }
 
@@ -283,11 +287,11 @@ impl ICH {
 
                 let opposite_vertex_id = edge.end;
                 if edge.length < self.vertex_infos[opposite_vertex_id].distance {
-                    self.vertex_infos[opposite_vertex_id].birth_time = 0;
+                    self.vertex_infos[opposite_vertex_id].birth_time = Some(0);
                     self.vertex_infos[opposite_vertex_id].distance = edge.length;
-                    self.vertex_infos[opposite_vertex_id].enter_edge = next_edge_id;
-                    self.vertex_infos[opposite_vertex_id].p = *source;
-                    self.vertex_infos[opposite_vertex_id].s = *source;
+                    self.vertex_infos[opposite_vertex_id].enter_edge = Some(next_edge_id);
+                    self.vertex_infos[opposite_vertex_id].p = Some(*source);
+                    self.vertex_infos[opposite_vertex_id].s = Some(*source);
 
                     if self.mesh.angles[opposite_vertex_id] < 2.0 * std::f64::consts::PI {
                         continue;
@@ -307,12 +311,12 @@ impl ICH {
             }
 
             // set source vertex info
-            self.vertex_infos[*source].birth_time = 0;
+            self.vertex_infos[*source].birth_time = Some(0);
             self.vertex_infos[*source].distance = 0.0;
-            self.vertex_infos[*source].enter_edge = usize::MAX;
+            self.vertex_infos[*source].enter_edge = None;
             self.vertex_infos[*source].is_source = true;
-            self.vertex_infos[*source].s = *source;
-            self.vertex_infos[*source].p = *source;
+            self.vertex_infos[*source].s = Some(*source);
+            self.vertex_infos[*source].p = Some(*source);
         }
 
         // create initial windows from source points (non-vertices)
@@ -346,12 +350,12 @@ impl ICH {
                 }
 
                 // set vertex info
-                self.vertex_infos[opposite_vertex_id].birth_time = 0;
+                self.vertex_infos[opposite_vertex_id].birth_time = Some(0);
                 self.vertex_infos[opposite_vertex_id].distance =
                     dist(position, &self.mesh.vertices[opposite_vertex_id].position);
-                self.vertex_infos[opposite_vertex_id].enter_edge = usize::MAX;
-                self.vertex_infos[opposite_vertex_id].s = source_id;
-                self.vertex_infos[opposite_vertex_id].p = source_id;
+                self.vertex_infos[opposite_vertex_id].enter_edge = None;
+                self.vertex_infos[opposite_vertex_id].s = Some(source_id);
+                self.vertex_infos[opposite_vertex_id].p = Some(source_id);
 
                 if self.mesh.angles[opposite_vertex_id] < 2.0 * std::f64::consts::PI {
                     continue;
@@ -434,8 +438,63 @@ impl ICH {
         // both child windows
         else {
             let opposite_vertex = self.mesh.edges[e1].end;
+            let direct_distance = (v2 - source_2d).norm();
 
-            (None, None)
+            // "one angle, one split" rule
+            let (build_left, build_right) = if direct_distance + window.sigma > self.split_infos[e0].distance && (direct_distance + window.sigma) / self.split_infos[e0].distance - 1.0 > RELATIVE_ERROR {
+                (self.split_infos[e0].x < inter_x, self.split_infos[e0].x >= inter_x)
+            } else {
+                if direct_distance + window.sigma < self.split_infos[e0].distance {
+                    self.split_infos[e0].distance = direct_distance + window.sigma;
+                    self.split_infos[e0].s = Some(window.s);
+                    self.split_infos[e0].p = Some(window.p);
+                    self.split_infos[e0].level = Some(window.level);
+                    self.split_infos[e0].x = l0 - inter_x;
+                }
+
+                if direct_distance + window.sigma < self.vertex_infos[opposite_vertex].distance {
+                    let birth = self.vertex_infos[window.p].birth_time;
+                    self.vertex_infos[opposite_vertex].birth_time = match birth {
+                        Some(t) => Some(t + 1),
+                        None => Some(0),
+                    };
+
+                    self.vertex_infos[opposite_vertex].distance = direct_distance + window.sigma;
+                    self.vertex_infos[opposite_vertex].enter_edge = Some(e0);
+                    self.vertex_infos[opposite_vertex].s = Some(window.s);
+                    self.vertex_infos[opposite_vertex].p = Some(window.p);
+
+                    if self.mesh.angles[opposite_vertex] > 2.0 * std::f64::consts::PI {
+                        let pseudo_win = PseudoWindow {
+                            vertex: opposite_vertex,
+                            distance: self.vertex_infos[opposite_vertex].distance,
+                            s: window.s,
+                            p: window.p,
+                            birth_time: self.vertex_infos[opposite_vertex].birth_time,
+                            level: window.level + 1,
+                        };
+                        self.pseudo_source_queue.push(pseudo_win);
+                    }
+                }
+
+                (true, true)
+            };
+
+            // compute the windows
+            let left_child = if build_left {
+                let t0 = self.intersect(source_2d, left, v0, v2);
+                Some(Window::build(window, e1, t0, 0.0, v0, v2))
+            } else {
+                None
+            };
+            let right_child = if build_right {
+                let t1 = self.intersect(source_2d, right, v2, v1);
+                Some(Window::build(window, e2, 0.0, t1, v2, v1))
+            } else {
+                None
+            };
+
+            (left_child, right_child)
         };
 
         if let Some(win) = left_win {
@@ -554,23 +613,45 @@ impl ICHStats {
 /// Information about each vertex during the ICH algorithm.
 #[derive(Debug, Clone)]
 struct VertexInfo {
-    birth_time: usize,
+    birth_time: Option<usize>,
     distance: f64,
-    enter_edge: usize,
+    enter_edge: Option<usize>,
     is_source: bool,
-    p: usize,
-    s: usize,
+    p: Option<usize>,
+    s: Option<usize>,
 }
 
 impl VertexInfo {
     pub fn new() -> Self {
         VertexInfo {
-            birth_time: usize::MAX,
+            birth_time: None,
             distance: f64::INFINITY,
-            enter_edge: usize::MAX,
+            enter_edge: None,
             is_source: false,
-            p: usize::MAX,
-            s: usize::MAX,
+            p: None,
+            s: None,
+        }
+    }
+}
+
+/// Information for split checks during window propagation.
+#[derive(Debug, Clone)]
+struct SplitInfo {
+    distance: f64,
+    s: Option<usize>,
+    p: Option<usize>,
+    level: Option<usize>,
+    x: f64,
+}
+
+impl SplitInfo {
+    pub fn new() -> Self {
+        SplitInfo {
+            distance: f64::INFINITY,
+            s: None,
+            p: None,
+            level: None,
+            x: f64::INFINITY,
         }
     }
 }
