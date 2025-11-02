@@ -3,7 +3,7 @@
 use nalgebra::Point3;
 use std::collections::BinaryHeap;
 
-use crate::mesh::Mesh;
+use crate::mesh::{Mesh, dist};
 
 #[derive(Debug, Clone)]
 struct Window {
@@ -32,6 +32,7 @@ struct Window {
 }
 
 impl Window {
+    /// Creates a new Window and computes its minimum distance.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         edge: usize,
@@ -135,7 +136,7 @@ pub struct ICH {
     window_queue: BinaryHeap<Window>,
     pseudo_source_queue: BinaryHeap<PseudoWindow>,
     stats: ICHStats,
-    vertex_infos: Vec<VertexInfo>
+    vertex_infos: Vec<VertexInfo>,
 }
 
 impl ICH {
@@ -195,7 +196,7 @@ impl ICH {
                     self.vertex_infos[opposite_vertex_id].s = *source;
 
                     if self.mesh.angles[opposite_vertex_id] < 2.0 * std::f64::consts::PI {
-                        continue
+                        continue;
                     }
 
                     let pseudo_win = PseudoWindow {
@@ -207,7 +208,6 @@ impl ICH {
                         level: 0,
                     };
                     self.pseudo_source_queue.push(pseudo_win);
-                    self.stats.pseudo_source_created();
                 }
             }
             self.vertex_infos[*source].birth_time = 0;
@@ -218,11 +218,55 @@ impl ICH {
             self.vertex_infos[*source].p = *source;
         }
 
-        for (_, _) in &self.source_points {
-            // Initialize windows at source points
-        }
+        for (i, (face_id, position)) in self.source_points.iter().enumerate() {
+            for j in 0..3 {
+                let opposite_edge_id = self.mesh.faces[*face_id].edges[j];
+                let opposite_edge = &self.mesh.edges[opposite_edge_id];
 
-        unimplemented!()
+                // create a new "vertex id" for the source point (which is not a vertex)
+                let source_id = self.mesh.vertices.len() + i;
+                let win = Window::new(
+                    opposite_edge_id,
+                    0.0,
+                    opposite_edge.length,
+                    dist(position, &self.mesh.vertices[opposite_edge.start].position),
+                    dist(position, &self.mesh.vertices[opposite_edge.end].position),
+                    0.0,
+                    source_id,
+                    source_id,
+                );
+                self.window_queue.push(win);
+                self.stats.window_created();
+
+                let opposite_vertex_id = opposite_edge.start;
+                if dist(position, &self.mesh.vertices[opposite_vertex_id].position)
+                    > self.vertex_infos[opposite_vertex_id].distance
+                {
+                    continue;
+                }
+
+                self.vertex_infos[opposite_vertex_id].birth_time = 0;
+                self.vertex_infos[opposite_vertex_id].distance =
+                    dist(position, &self.mesh.vertices[opposite_vertex_id].position);
+                self.vertex_infos[opposite_vertex_id].enter_edge = usize::MAX;
+                self.vertex_infos[opposite_vertex_id].s = source_id;
+                self.vertex_infos[opposite_vertex_id].p = source_id;
+
+                if self.mesh.angles[opposite_vertex_id] < 2.0 * std::f64::consts::PI {
+                    continue;
+                }
+
+                let pseudo_win = PseudoWindow {
+                    vertex: opposite_vertex_id,
+                    distance: dist(position, &self.mesh.vertices[opposite_vertex_id].position),
+                    s: source_id,
+                    p: source_id,
+                    birth_time: self.vertex_infos[opposite_vertex_id].birth_time,
+                    level: 0,
+                };
+                self.pseudo_source_queue.push(pseudo_win);
+            }
+        }
     }
 
     fn propagate_window(&self, window: &Window) {
@@ -234,8 +278,6 @@ impl ICH {
 pub struct ICHStats {
     pub windows_created: usize,
     pub windows_propagated: usize,
-    pub pseudo_sources_created: usize,
-    pub pseudo_sources_propagated: usize,
 }
 
 impl ICHStats {
@@ -246,14 +288,6 @@ impl ICHStats {
     pub fn window_propagated(&mut self) {
         self.windows_propagated += 1;
     }
-
-    pub fn pseudo_source_created(&mut self) {
-        self.pseudo_sources_created += 1;
-    }
-
-    pub fn pseudo_source_propagated(&mut self) {
-        self.pseudo_sources_propagated += 1;
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -263,7 +297,7 @@ struct VertexInfo {
     enter_edge: usize,
     is_source: bool,
     p: usize,
-    s: usize
+    s: usize,
 }
 
 impl VertexInfo {
@@ -274,7 +308,45 @@ impl VertexInfo {
             enter_edge: usize::MAX,
             is_source: false,
             p: usize::MAX,
-            s: usize::MAX
+            s: usize::MAX,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::loader::load_manifold;
+
+    #[test]
+    fn test_ich_init_teddy() {
+        let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![0, 1, 2, 3, 4];
+        let source_points = vec![];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.init();
+
+        assert_eq!(ich.stats.windows_created, 32);
+    }
+
+    #[test]
+    fn test_ich_init_teddy_2() {
+        let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![5, 6, 7, 8, 9];
+        let source_points = vec![
+            (0, Point3::new(0.0, 0.0, 0.0)),
+            (1, Point3::new(1.0, 1.0, 1.0)),
+            (2, Point3::new(2.0, 2.0, 2.0)),
+        ];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.init();
+
+        assert_eq!(ich.stats.windows_created, 43);
     }
 }

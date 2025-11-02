@@ -159,6 +159,11 @@ impl Mesh {
     }
 }
 
+/// Compute the Euclidean distance between two 3D points
+pub fn dist(p1: &Point3<f64>, p2: &Point3<f64>) -> f64 {
+    (p1 - p2).norm()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
