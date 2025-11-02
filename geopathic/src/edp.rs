@@ -1,23 +1,12 @@
+use core::f32;
 use std::collections::HashMap;
 
-use crate::manifold::{Manifold, Point, Triangle};
+use crate::manifold::{Manifold, Point};
 use nalgebra::{DMatrix, DVector};
-
-fn cross_product(a: &Point, b: &Point) -> DVector<f32> {
-    if a.len() >= 3 && b.len() >= 3 {
-        DVector::from_vec(vec![
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0],
-        ])
-    } else {
-        DVector::zeros(3)
-    }
-}
 
 fn compute_cotangent(a: &Point, b: &Point) -> f32 {
     let dot = a.dot(b);
-    let cross = cross_product(a, b);
+    let cross = a.cross(b);
     let cross_norm = cross.norm();
 
     if cross_norm > 1e-10 {
@@ -43,11 +32,14 @@ impl Manifold {
         let u1 = vertex_values[j];
         let u2 = vertex_values[k];
 
-        let e1 = v1 - v0;
-        let e2 = v2 - v0;
+        let e0 = v2 - v1;
+        let e1 = v0 - v2;
+        let e2 = v1 - v0;
 
         // Compute face normal
-        let normal = cross_product(&e1, &e2);
+        let edge1 = v1 - v0;
+        let edge2 = v2 - v0;
+        let normal = edge1.cross(&edge2);
         let double_area = normal.norm();
 
         if double_area < 1e-10 {
@@ -57,12 +49,9 @@ impl Manifold {
         let n = normal / double_area;
 
         // Gradient using barycentric formula
-        let e0 = v2 - v1;
 
-        let grad = (cross_product(&n, &e2) * u0
-            + cross_product(&n, &e0) * u1
-            + cross_product(&n, &e1) * u2)
-            / double_area;
+        let grad =
+            ((&n.cross(&e0) * u0) + (&n.cross(&e1) * u1) + (&n.cross(&e2) * u2)) / double_area;
 
         Ok(grad)
     }
@@ -101,9 +90,9 @@ impl Manifold {
 }
 
 #[derive(Debug, Clone)]
-struct Laplacian {
-    laplace_matrix: DMatrix<f32>,
-    n_vertices: usize,
+pub struct Laplacian {
+    pub laplace_matrix: DMatrix<f32>,
+    pub n_vertices: usize,
 }
 
 impl Laplacian {
@@ -159,7 +148,7 @@ impl Laplacian {
         let kj = vj - vk;
 
         let dot = ki.dot(&kj);
-        let cross_norm = cross_product(&ki, &kj).norm();
+        let cross_norm = ki.cross(&kj).norm();
 
         if cross_norm > 1e-10 {
             let cot = dot / cross_norm;
@@ -180,7 +169,7 @@ impl Laplacian {
 
 pub struct HeatMethod<'a> {
     manifold: &'a Manifold,
-    laplace: Laplacian,
+    pub laplace: Laplacian,
     time_step: f32,
 }
 
@@ -198,12 +187,13 @@ impl<'a> HeatMethod<'a> {
 
         // (I + t*L)u = δ_source
         let identity = DMatrix::identity(n, n);
-        let heat_matrix = &identity - &self.laplace.laplace_matrix * self.time_step;
+        let heat_matrix = &identity + &self.laplace.laplace_matrix * self.time_step;
 
         let mut rhs = DVector::zeros(n);
         rhs[source] = 1.0;
 
         let u = Self::solve_linear_system(&heat_matrix, &rhs)?;
+        // println!("U: {}", u.clone());
 
         // X = -∇u / |∇u|
         let mut face_gradients = Vec::new();
@@ -212,31 +202,33 @@ impl<'a> HeatMethod<'a> {
             let gradient = self.manifold.compute_face_gradient(face_idx, &u)?;
 
             let grad_norm = gradient.norm();
-            let normalized_grad = if grad_norm > 1e-10 {
+            let normalized_grad = if grad_norm > 1e-6 {
                 -gradient / grad_norm
             } else {
                 DVector::zeros(3)
             };
-
             face_gradients.push(normalized_grad);
         }
 
         // Solve Poisson equation L*φ = ∇·X
         let divergence_x = self.manifold.compute_divergence(&face_gradients)?;
 
-        let phi = Self::solve_linear_system(&self.laplace.laplace_matrix, &divergence_x)?;
+        let regularization = 1e-2;
+        let regularized_laplacian = &self.laplace.laplace_matrix + &identity * regularization;
 
-        let min_phi = phi.iter().cloned().fold(f32::INFINITY, f32::min);
-        let distances = phi.map(|x| x - min_phi);
+        let phi = Self::solve_linear_system(&regularized_laplacian, &divergence_x)?;
+        let distances = phi.map(|x| x - phi[source]);
 
         Ok(distances)
     }
 
     fn solve_linear_system(a: &DMatrix<f32>, b: &DVector<f32>) -> Result<DVector<f32>, String> {
-        a.clone()
-            .lu()
-            .solve(b)
-            .ok_or_else(|| "Failed to solve linear system".to_string())
+        match a.clone().cholesky().ok_or_else(|| {
+            "Failed to solve linear system (matrix may be singular or ill-conditioned)".to_string()
+        }) {
+            Ok(ll) => Ok(ll.solve(b)),
+            Err(e) => Err(e),
+        }
     }
 }
 
