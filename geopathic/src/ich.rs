@@ -215,6 +215,7 @@ impl ICH {
 
         // main loop: while there are windows or pseudo windows to process
         while !self.window_queue.is_empty() || !self.pseudo_source_queue.is_empty() {
+            self.stats.iteration();
             self.stats.update_max_queue_size(self.window_queue.len());
             self.stats
                 .update_max_pseudo_queue_size(self.pseudo_source_queue.len());
@@ -539,11 +540,15 @@ impl ICH {
             (left_child, right_child)
         };
 
-        if let Some(win) = left_win && self.is_valid_window(&win, true) {
+        if let Some(win) = left_win
+            && self.is_valid_window(&win, true)
+        {
             self.window_queue.push(win);
             self.stats.window_created();
         }
-        if let Some(win) = right_win && self.is_valid_window(&win, false) {
+        if let Some(win) = right_win
+            && self.is_valid_window(&win, false)
+        {
             self.window_queue.push(win);
             self.stats.window_created();
         }
@@ -806,7 +811,7 @@ impl ICH {
 
         // compute point p3 in 2D
         let x = (l2.powi(2) + l0.powi(2) - l1.powi(2)) / (2.0 * l0);
-        let p3 = Point2::new(x, f64::sqrt((l1.powi(2) - x.powi(2)).abs()));
+        let p3 = Point2::new(x, f64::sqrt((l2.powi(2) - x.powi(2)).abs()));
 
         // window points in 2D
         let a = Point2::new(window.b0, 0.0);
@@ -826,14 +831,11 @@ impl ICH {
             return false;
         }
         if s_a > self.vertex_infos[v2].distance + (l0 - window.b0)
-            && window.sigma
-                + (src_2d - a).norm() / (self.vertex_infos[v2].distance + (l0 - window.b0))
-                - 1.0
-                > 0.0
+            && s_a / (self.vertex_infos[v2].distance + (l0 - window.b0)) - 1.0 > 0.0
         {
             return false;
         }
-        if is_left && s_a > p3_a && window.sigma + (src_2d - a).norm() / p3_a - 1.0 > 0.0 {
+        if is_left && s_a > p3_a && (window.sigma + (src_2d - a).norm()) / p3_a - 1.0 > 0.0 {
             return false;
         }
         if !is_left && s_b > p3_b && s_b / p3_b - 1.0 > RELATIVE_ERROR {
@@ -850,6 +852,7 @@ pub struct ICHStats {
     pub windows_propagated: usize,
     pub max_queue_size: usize,
     pub max_pseudo_queue_size: usize,
+    pub iterations: usize,
 }
 
 impl ICHStats {
@@ -871,6 +874,10 @@ impl ICHStats {
         if size > self.max_pseudo_queue_size {
             self.max_pseudo_queue_size = size;
         }
+    }
+
+    pub fn iteration(&mut self) {
+        self.iterations += 1;
     }
 }
 
