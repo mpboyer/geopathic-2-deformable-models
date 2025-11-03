@@ -433,15 +433,8 @@ impl ICH {
                 v1.coords,
             );
 
-            // check if it is valid
-            let right_win = if self.is_valid_window(&right_win, false) {
-                Some(right_win)
-            } else {
-                None
-            };
-
             // return only right window
-            (None, right_win)
+            (None, Some(right_win))
         }
         // only left child window
         else if inter_x >= right.x {
@@ -458,15 +451,8 @@ impl ICH {
                 v2.coords,
             );
 
-            // check if it is valid
-            let left_win = if self.is_valid_window(&left_win, true) {
-                Some(left_win)
-            } else {
-                None
-            };
-
             // return only left window
-            (left_win, None)
+            (Some(left_win), None)
         }
         // both child windows
         else {
@@ -553,11 +539,11 @@ impl ICH {
             (left_child, right_child)
         };
 
-        if let Some(win) = left_win {
+        if let Some(win) = left_win && self.is_valid_window(&win, true) {
             self.window_queue.push(win);
             self.stats.window_created();
         }
-        if let Some(win) = right_win {
+        if let Some(win) = right_win && self.is_valid_window(&win, false) {
             self.window_queue.push(win);
             self.stats.window_created();
         }
@@ -835,7 +821,7 @@ impl ICH {
 
         // apply the filters
         if s_b > self.vertex_infos[v1].distance + window.b1
-            && s_b / (self.vertex_infos[v1].distance + window.b1) - 1.0 > 0.0
+            && s_b / (self.vertex_infos[v1].distance + window.b1) - 1.0 > RELATIVE_ERROR
         {
             return false;
         }
