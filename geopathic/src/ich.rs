@@ -640,7 +640,7 @@ impl ICH {
         }
     }
 
-    fn pseudo_source_sub_windows(
+    fn window_sub_windows(
         &self,
         pseudo_window: &PseudoWindow,
     ) -> (Option<usize>, Option<usize>) {
@@ -702,8 +702,8 @@ impl ICH {
             let next_edge = self.mesh.edges[opposite_edge].next_edge;
 
             let l0_bis = self.mesh.edges[current_edge].length;
-            let l1_bis = self.mesh.edges[next_edge].length;
-            let l2_bis = self.mesh.edges[opposite_edge].length;
+            let l1_bis = self.mesh.edges[opposite_edge].length;
+            let l2_bis = self.mesh.edges[next_edge].length;
 
             let current_angle = ((l0_bis.powi(2) + l1_bis.powi(2) - l2_bis.powi(2))
                 / (2.0 * l0_bis * l1_bis))
@@ -714,14 +714,14 @@ impl ICH {
         }
         if let Some(current_edge) = current_edge_opt {
             let end_edge_id =
-                self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge;
+                self.mesh.edges[self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge].next_edge;
             end_edge = self.mesh.edges[end_edge_id].twin_edge;
         }
 
         (start_edge, end_edge)
     }
 
-    fn window_sub_windows(&self, pseudo_window: &PseudoWindow) -> (Option<usize>, Option<usize>) {
+    fn pseudo_source_sub_windows(&self, pseudo_window: &PseudoWindow) -> (Option<usize>, Option<usize>) {
         let mut angle0 = 0.0;
         let mut angle1 = 0.0;
 
