@@ -758,6 +758,7 @@ impl ICH {
 
         // traverse from the right
         current_edge_opt = self.vertex_infos[pseudo_window.vertex].enter_edge;
+        current_edge_opt = self.mesh.edges[current_edge_opt.unwrap()].twin_edge;
         while angle1 < std::f64::consts::PI
             && let Some(current_edge) = current_edge_opt
         {
@@ -1066,5 +1067,17 @@ mod tests {
 
         assert_eq!(ich.stats.windows_created, 84);
         assert_eq!(ich.stats.max_queue_size, 20);
+    }
+
+    #[test]
+    fn test_run_ich_source_points() {
+        let manifold = load_manifold("../examples/models/pyramid.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let mut ich = ICH::new(mesh, vec![1], vec![(1, Point3::new(0.5, 0.5, 0.5)), (2, Point3::new(1.5, 1.5, 1.5))], vec![]);
+        ich.run();
+
+        assert_eq!(ich.stats.windows_created, 21);
+        assert_eq!(ich.stats.max_queue_size, 12);
+        assert_eq!(ich.stats.max_pseudo_queue_size, 0);
     }
 }
