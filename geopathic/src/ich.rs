@@ -130,7 +130,7 @@ impl Eq for Window {}
 
 impl Ord for Window {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.min_distance > other.min_distance {
+        if self.min_distance >= other.min_distance {
             std::cmp::Ordering::Less
         } else {
             std::cmp::Ordering::Greater
@@ -159,7 +159,7 @@ impl Eq for PseudoWindow {}
 
 impl Ord for PseudoWindow {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.distance < other.distance {
+        if self.distance <= other.distance {
             std::cmp::Ordering::Less
         } else {
             std::cmp::Ordering::Greater
@@ -299,7 +299,7 @@ impl ICH {
                     0.0,
                     next_edge.length,
                     edge.length,
-                    next_edge.length,
+                    self.mesh.edges[next_edge.next_edge].length,
                     0.0,
                     *source,
                     *source,
@@ -452,8 +452,8 @@ impl ICH {
         // only left child window
         else if inter_x >= right.x {
             // compute the window
-            let t0 = self.intersect(source_2d, left, v2, v1);
-            let t1 = self.intersect(source_2d, right, v2, v1);
+            let t0 = self.intersect(source_2d, left, v0, v2);
+            let t1 = self.intersect(source_2d, right, v0, v2);
             let left_win = Window::build(
                 window,
                 e1,
