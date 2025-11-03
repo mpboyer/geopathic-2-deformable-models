@@ -698,12 +698,12 @@ impl ICH {
         while angle1 < std::f64::consts::PI
             && let Some(current_edge) = current_edge_opt
         {
-            let opposite_edge = self.mesh.edges[current_edge].next_edge;
-            let next_edge = self.mesh.edges[opposite_edge].next_edge;
+            let next_edge = self.mesh.edges[current_edge].next_edge;
+            let opposite_edge = self.mesh.edges[next_edge].next_edge;
 
             let l0_bis = self.mesh.edges[current_edge].length;
-            let l1_bis = self.mesh.edges[opposite_edge].length;
-            let l2_bis = self.mesh.edges[next_edge].length;
+            let l1_bis = self.mesh.edges[next_edge].length;
+            let l2_bis = self.mesh.edges[opposite_edge].length;
 
             let current_angle = ((l0_bis.powi(2) + l1_bis.powi(2) - l2_bis.powi(2))
                 / (2.0 * l0_bis * l1_bis))
