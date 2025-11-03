@@ -281,6 +281,18 @@ impl ICH {
     pub fn print_stats(&self) {
         println!("{:#?}", self.stats);
     }
+
+    pub fn distance_to_vertex(&self, vertex_id: usize) -> f64 {
+        self.vertex_infos[vertex_id].distance
+    }
+
+    pub fn distances_to_vertices(&self) -> Vec<f64> {
+        self.vertex_infos.iter().map(|info| info.distance).collect()
+    }
+
+    pub fn distance_to_point(&self, _face_id: usize, _position: Point3<f64>) -> f64 {
+        unimplemented!()
+    }
 }
 
 impl ICH {
@@ -1073,11 +1085,51 @@ mod tests {
     fn test_run_ich_source_points() {
         let manifold = load_manifold("../examples/models/pyramid.obj").unwrap();
         let mesh = Mesh::from_manifold(&manifold);
-        let mut ich = ICH::new(mesh, vec![1], vec![(1, Point3::new(0.5, 0.5, 0.5)), (2, Point3::new(1.5, 1.5, 1.5))], vec![]);
+        let mut ich = ICH::new(
+            mesh,
+            vec![1],
+            vec![
+                (1, Point3::new(0.5, 0.5, 0.5)),
+                (2, Point3::new(1.5, 1.5, 1.5)),
+            ],
+            vec![],
+        );
         ich.run();
 
         assert_eq!(ich.stats.windows_created, 21);
         assert_eq!(ich.stats.max_queue_size, 12);
         assert_eq!(ich.stats.max_pseudo_queue_size, 0);
     }
+
+    #[test]
+    fn test_run_ich_teddy() {
+        let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![0, 1, 2, 3, 4];
+        let source_points = vec![];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.run();
+
+        assert_eq!(ich.stats.windows_created, 310523);
+        assert_eq!(ich.stats.max_queue_size, 1402);
+    }
+
+    #[test]
+    fn test_run_ich_mountain() {
+        let manifold = load_manifold("../examples/models/mountain.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![0, 1, 2, 3, 4];
+        let source_points = vec![];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.run();
+
+        assert_eq!(ich.stats.windows_created, 74);
+        assert_eq!(ich.stats.max_queue_size, 16);
+    }
+
+    // TODO: distances tests
 }
