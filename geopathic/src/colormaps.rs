@@ -42,14 +42,28 @@ pub fn vertical_colormap(manifold: &Manifold) -> Vec<[u8; 4]> {
     colormap
 }
 
-/// Create a colormap from distance values, mapping from purple (#7d1dd3) to yellow (#ffe500)
-/// The distance value for each face is the mean of its vertex distances
+/// Create a colormap from distance values, mapping from purple (#7d1dd3) to yellow (#ffe500).
+/// The distance value for each face is the mean of its vertex distances.
+/// Infinite distances are colored grey.
 pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f32>) -> Vec<[u8; 4]> {
     let mut colormap = Vec::with_capacity(manifold.faces().len());
 
+    // Only keep finite distances for min/max calculation
+    let finite_distances: Vec<f32> = distances
+        .iter()
+        .cloned()
+        .filter(|d| d.is_finite())
+        .collect();
+
     // Find min and max distances for normalization
-    let min_dist = distances.iter().cloned().fold(f32::INFINITY, f32::min);
-    let max_dist = distances.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let min_dist = finite_distances
+        .iter()
+        .cloned()
+        .fold(f32::INFINITY, f32::min);
+    let max_dist = finite_distances
+        .iter()
+        .cloned()
+        .fold(f32::NEG_INFINITY, f32::max);
     let range = max_dist - min_dist;
 
     // Color endpoints: purple #7d1dd3 to yellow #ffe500
@@ -69,12 +83,15 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f32>) -> Vec<[
             0.0
         };
 
-        // Interpolate colors
-        let r = (color_start[0] + t * (color_end[0] - color_start[0])) as u8;
-        let g = (color_start[1] + t * (color_end[1] - color_start[1])) as u8;
-        let b = (color_start[2] + t * (color_end[2] - color_start[2])) as u8;
-
-        colormap.push([r, g, b, 255]);
+        if mean_dist.is_infinite() {
+            colormap.push([200, 200, 200, 255]); // Grey for infinite distances
+        } else {
+            // Interpolate colors
+            let r = (color_start[0] + t * (color_end[0] - color_start[0])) as u8;
+            let g = (color_start[1] + t * (color_end[1] - color_start[1])) as u8;
+            let b = (color_start[2] + t * (color_end[2] - color_start[2])) as u8;
+            colormap.push([r, g, b, 255]);
+        }
     }
 
     colormap
