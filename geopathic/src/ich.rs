@@ -221,7 +221,9 @@ impl ICH {
                 .update_max_pseudo_queue_size(self.pseudo_source_queue.len());
 
             // remove invalid windows, that is, whose birth time is not equal than the current one
-            while let Some(win) = self.window_queue.peek() {
+            while let Some(win) = self.window_queue.peek()
+                && win.p < self.vertex_infos.len()
+            {
                 if win.birth_time != self.vertex_infos[win.p].birth_time {
                     self.window_queue.pop();
                 } else {
@@ -230,7 +232,9 @@ impl ICH {
             }
 
             // remove invalid pseudo windows
-            while let Some(pseudo_win) = self.pseudo_source_queue.peek() {
+            while let Some(pseudo_win) = self.pseudo_source_queue.peek()
+                && pseudo_win.vertex < self.vertex_infos.len()
+            {
                 if pseudo_win.birth_time != self.vertex_infos[pseudo_win.vertex].birth_time {
                     self.pseudo_source_queue.pop();
                 } else {
@@ -640,10 +644,7 @@ impl ICH {
         }
     }
 
-    fn window_sub_windows(
-        &self,
-        pseudo_window: &PseudoWindow,
-    ) -> (Option<usize>, Option<usize>) {
+    fn window_sub_windows(&self, pseudo_window: &PseudoWindow) -> (Option<usize>, Option<usize>) {
         let e0 = self.vertex_infos[pseudo_window.vertex].enter_edge.unwrap();
         let e1 = self.mesh.edges[e0].next_edge;
         let e2 = self.mesh.edges[e1].next_edge;
@@ -713,15 +714,19 @@ impl ICH {
             current_edge_opt = self.mesh.edges[next_edge].twin_edge;
         }
         if let Some(current_edge) = current_edge_opt {
-            let end_edge_id =
-                self.mesh.edges[self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge].next_edge;
+            let end_edge_id = self.mesh.edges
+                [self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge]
+                .next_edge;
             end_edge = self.mesh.edges[end_edge_id].twin_edge;
         }
 
         (start_edge, end_edge)
     }
 
-    fn pseudo_source_sub_windows(&self, pseudo_window: &PseudoWindow) -> (Option<usize>, Option<usize>) {
+    fn pseudo_source_sub_windows(
+        &self,
+        pseudo_window: &PseudoWindow,
+    ) -> (Option<usize>, Option<usize>) {
         let mut angle0 = 0.0;
         let mut angle1 = 0.0;
 
@@ -770,8 +775,9 @@ impl ICH {
             current_edge_opt = self.mesh.edges[next_edge].twin_edge;
         }
         if let Some(current_edge) = current_edge_opt {
-            let end_edge_id =
-                self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge;
+            let end_edge_id = self.mesh.edges
+                [self.mesh.edges[self.mesh.edges[current_edge].twin_edge.unwrap()].next_edge]
+                .next_edge;
             end_edge = self.mesh.edges[end_edge_id].twin_edge;
         }
 
