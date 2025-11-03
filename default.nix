@@ -1,16 +1,17 @@
 {
   sources ? import ./lon.nix,
-  pkgs ? import sources.nixpkgs { },
+  pkgs ? import sources.nixpkgs { overlays = [ (import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz")) ]; },
 }:
+
 let
   inherit (pkgs) lib;
 in
 {
   devShell = pkgs.mkShell rec {
     buildInputs = with pkgs; [
-	  cargo
       libxkbcommon
       libGL
+      rust-bin.beta.latest.default
 
       # WINIT_UNIX_BACKEND=wayland
       wayland
