@@ -6,7 +6,7 @@ use std::collections::BinaryHeap;
 
 const RELATIVE_ERROR: f64 = 1e-6;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct Window {
     /// index of the edge the window is on
     edge: usize,
@@ -111,12 +111,6 @@ impl Window {
         let x_projection = (self.d0.powi(2) - self.d1.powi(2) + tau.powi(2)) / (2.0 * tau);
         let y_projection = f64::sqrt((self.d0.powi(2) - x_projection.powi(2)).abs());
         Point2::new(x_projection + self.b0, y_projection)
-    }
-}
-
-impl PartialEq for Window {
-    fn eq(&self, other: &Self) -> bool {
-        self.min_distance == other.min_distance
     }
 }
 
@@ -418,7 +412,7 @@ impl ICH {
         let l1 = self.mesh.edges[e1].length;
         let l2 = self.mesh.edges[e2].length;
         let v0 = Point2::new(0.0, 0.0);
-        let v1 = Point2::new(l1, 0.0);
+        let v1 = Point2::new(l0, 0.0);
         let x = (l1.powi(2) + l0.powi(2) - l2.powi(2)) / (2.0 * l0);
         let v2 = Point2::new(x, -f64::sqrt((l1.powi(2) - x.powi(2)).abs()));
 
@@ -440,7 +434,7 @@ impl ICH {
             );
 
             // check if it is valid
-            let right_win = if self.is_valid_window(window, false) {
+            let right_win = if self.is_valid_window(&right_win, false) {
                 Some(right_win)
             } else {
                 None
@@ -465,7 +459,7 @@ impl ICH {
             );
 
             // check if it is valid
-            let left_win = if self.is_valid_window(window, true) {
+            let left_win = if self.is_valid_window(&left_win, true) {
                 Some(left_win)
             } else {
                 None
@@ -547,7 +541,7 @@ impl ICH {
                     window,
                     e2,
                     self.mesh.edges[e2].length,
-                    0.0,
+                    1.0,
                     t1,
                     v2.coords,
                     v1.coords,
@@ -846,11 +840,14 @@ impl ICH {
             return false;
         }
         if s_a > self.vertex_infos[v2].distance + (l0 - window.b0)
-            && s_a / (self.vertex_infos[v2].distance + (l0 - window.b0)) - 1.0 > 0.0
+            && window.sigma
+                + (src_2d - a).norm() / (self.vertex_infos[v2].distance + (l0 - window.b0))
+                - 1.0
+                > 0.0
         {
             return false;
         }
-        if is_left && s_a > p3_a && s_a / p3_a - 1.0 > 0.0 {
+        if is_left && s_a > p3_a && window.sigma + (src_2d - a).norm() / p3_a - 1.0 > 0.0 {
             return false;
         }
         if !is_left && s_b > p3_b && s_b / p3_b - 1.0 > RELATIVE_ERROR {
