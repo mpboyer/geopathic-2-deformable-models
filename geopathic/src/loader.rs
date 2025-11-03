@@ -20,7 +20,7 @@ pub fn load_manifold(file_path: &str) -> Result<Manifold, obj::ObjError> {
             for poly in group.polys {
                 let indices: Vec<usize> = poly.0.iter().map(|v| v.0).collect();
                 if indices.len() > 3 {
-                    println!(
+                    panic!(
                         "Warning: Non-triangular face detected with {} vertices. Only triangular faces are supported.",
                         indices.len()
                     );

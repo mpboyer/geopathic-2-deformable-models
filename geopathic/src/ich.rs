@@ -559,7 +559,7 @@ impl ICH {
         let (mut start_edge, end_edge) = if self.vertex_infos[pseudo_window.vertex]
             .enter_edge
             .is_none()
-            && self.vertex_infos[pseudo_window.vertex].birth_time.is_none()
+            && self.vertex_infos[pseudo_window.vertex].birth_time.is_some()
         {
             let start = self.mesh.vertices[pseudo_window.vertex].edges[0];
             (start, start)
@@ -826,7 +826,7 @@ impl ICH {
 
         // apply the filters
         if s_b > self.vertex_infos[v1].distance + window.b1
-            && s_b / (self.vertex_infos[v1].distance + window.b1) - 1.0 > RELATIVE_ERROR
+            && s_b / (self.vertex_infos[v1].distance + window.b1) - 1.0 > 0.0
         {
             return false;
         }
@@ -985,5 +985,80 @@ mod tests {
 
         assert!(first.min_distance <= second.min_distance);
         assert!(second.min_distance <= third.min_distance);
+    }
+
+    #[test]
+    fn test_run_ich_tetrahedron() {
+        let manifold = load_manifold("../examples/models/4_tetrahedron.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![0];
+        let source_points = vec![];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.run();
+
+        assert_eq!(ich.stats.windows_created, 9);
+        assert_eq!(ich.stats.max_queue_size, 6);
+    }
+
+    #[test]
+    fn test_run_ich_hexahedron() {
+        let manifold = load_manifold("../examples/models/6_hexahedron.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![0];
+        let source_points = vec![];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.run();
+
+        assert_eq!(ich.stats.windows_created, 36);
+        assert_eq!(ich.stats.max_queue_size, 12);
+    }
+
+    #[test]
+    fn test_run_ich_octahedron() {
+        let manifold = load_manifold("../examples/models/8_octahedron.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![0];
+        let source_points = vec![];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.run();
+
+        assert_eq!(ich.stats.windows_created, 28);
+        assert_eq!(ich.stats.max_queue_size, 8);
+    }
+
+    #[test]
+    fn test_run_ich_dodecahedron() {
+        let manifold = load_manifold("../examples/models/12_dodecahedron.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![0];
+        let source_points = vec![];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.run();
+
+        assert_eq!(ich.stats.windows_created, 142);
+        assert_eq!(ich.stats.max_queue_size, 24);
+    }
+
+    #[test]
+    fn test_run_ich_icosahedron() {
+        let manifold = load_manifold("../examples/models/20_icosahedron.obj").unwrap();
+        let mesh = Mesh::from_manifold(&manifold);
+        let source_vertices = vec![0];
+        let source_points = vec![];
+        let kept_faces = vec![];
+
+        let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
+        ich.run();
+
+        assert_eq!(ich.stats.windows_created, 84);
+        assert_eq!(ich.stats.max_queue_size, 20);
     }
 }
