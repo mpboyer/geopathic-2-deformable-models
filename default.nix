@@ -11,7 +11,7 @@ in
     buildInputs = with pkgs; [
       libxkbcommon
       libGL
-      rust-bin.beta.latest.default
+      rust-bin.beta.latest.complete
 
       # WINIT_UNIX_BACKEND=wayland
       wayland

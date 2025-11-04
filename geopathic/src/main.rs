@@ -11,24 +11,24 @@ use kiss3d::camera::ArcBall;
 use nalgebra::{DVector, Point3};
 
 fn main() {
-    // heat_method();
-    ich();
+    heat_method();
+    // ich();
 }
 
 #[allow(dead_code)]
 fn heat_method() {
     let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
-    let heat_method = HeatMethod::new(&manifold, 10.0);
+    let heat_method = HeatMethod::new(&manifold, 0.5);
     let distances = match heat_method.compute_distance(0) {
         Ok(it) => it,
         Err(err) => panic!("{}", err),
     };
     let colormap = distance_colormap(&manifold, &distances);
-    println!("{}", distances);
 
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
     viewer.plot_curves(iso_distances(&manifold, &distances, 1e-6));
+    viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
     viewer.render(true);
 }
 

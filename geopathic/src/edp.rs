@@ -79,10 +79,9 @@ impl Manifold {
             let cot_i = compute_cotangent(&(-&eij), &eik);
             let cot_j = compute_cotangent(&eij, &ejk);
 
-            // Add contributions to divergence
-            divergence[i] += 0.5 * (cot_j * (eij.dot(x)) + cot_k * (eik.dot(x)));
-            divergence[j] += 0.5 * (cot_i * ((-&eij).dot(x)) + cot_k * (ejk.dot(x)));
-            divergence[k] += 0.5 * (cot_i * ((-&eik).dot(x)) + cot_j * ((-&ejk).dot(x)));
+            divergence[i] += 0.5 * (cot_k * (eij.dot(x)) + cot_j * (eik.dot(x)));
+            divergence[j] += 0.5 * (cot_i * (ejk.dot(x)) + cot_k * ((-&eij).dot(x)));
+            divergence[k] += 0.5 * (cot_j * ((-&eik).dot(x)) + cot_i * ((-&ejk).dot(x)));
         }
 
         Ok(divergence)
@@ -188,18 +187,22 @@ impl<'a> HeatMethod<'a> {
         // (I + t*L)u = δ_source
         let identity = DMatrix::identity(n, n);
         let heat_matrix = &identity + &self.laplace.laplace_matrix * self.time_step;
+        // dbg!(&self.laplace.laplace_matrix);
+        // dbg!(&heat_matrix);
 
         let mut rhs = DVector::zeros(n);
         rhs[source] = 1.0;
+        // dbg!(&rhs);
 
         let u = Self::solve_linear_system(&heat_matrix, &rhs)?;
-        // println!("U: {}", u.clone());
+        // dbg!(&u);
 
         // X = -∇u / |∇u|
         let mut face_gradients = Vec::new();
 
         for face_idx in 0..self.manifold.faces().len() {
             let gradient = self.manifold.compute_face_gradient(face_idx, &u)?;
+            // dbg!(&gradient);
 
             let grad_norm = gradient.norm();
             let normalized_grad = if grad_norm > 1e-6 {
@@ -207,28 +210,25 @@ impl<'a> HeatMethod<'a> {
             } else {
                 DVector::zeros(3)
             };
+            // dbg!(&normalized_grad);
             face_gradients.push(normalized_grad);
         }
 
         // Solve Poisson equation L*φ = ∇·X
         let divergence_x = self.manifold.compute_divergence(&face_gradients)?;
 
-        let regularization = 1e-2;
+        let regularization = 0.0;
         let regularized_laplacian = &self.laplace.laplace_matrix + &identity * regularization;
 
         let phi = Self::solve_linear_system(&regularized_laplacian, &divergence_x)?;
         let distances = phi.map(|x| x - phi[source]);
+        dbg!(&distances);
 
         Ok(distances)
     }
 
     fn solve_linear_system(a: &DMatrix<f32>, b: &DVector<f32>) -> Result<DVector<f32>, String> {
-        match a.clone().cholesky().ok_or_else(|| {
-            "Failed to solve linear system (matrix may be singular or ill-conditioned)".to_string()
-        }) {
-            Ok(ll) => Ok(ll.solve(b)),
-            Err(e) => Err(e),
-        }
+        a.clone().lu().solve(b).ok_or_else(|| "CPT".to_string())
     }
 }
 
