@@ -1,6 +1,6 @@
 //! Defines a Mesh structure, extending Manifold by precomputing some data.
 
-use nalgebra::Point3;
+use nalgebra::{Point2, Point3};
 
 use crate::manifold;
 
@@ -160,11 +160,27 @@ impl Mesh {
             .map(|&edge_index| &self.edges[edge_index])
             .collect()
     }
+
+    pub fn point_on_edge(&self, edge_index: usize, t: f64) -> Point3<f64> {
+        let edge = &self.edges[edge_index];
+        let v_start = &self.vertices[edge.start].position;
+        let v_end = &self.vertices[edge.end].position;
+        v_start + (v_end - v_start) * t / edge.length
+    }
 }
 
 /// Compute the Euclidean distance between two 3D points
 pub fn dist(p1: &Point3<f64>, p2: &Point3<f64>) -> f64 {
     (p1 - p2).norm()
+}
+
+/// Checks whether `p` is on the left of the line formed by `a` and `b`
+pub fn is_left(p: &Point2<f64>, a: &Point2<f64>, b: &Point2<f64>) -> bool {
+    let ab = b - a;
+    let ab = ab.normalize();
+    let ap = p - a;
+    let ap = ap.normalize();
+    (ab.x * ap.y - ab.y * ap.x) > 0.0
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 //! Implementation of the Improved Chen-Han (ICH) algorithm for pathfinding.
 
-use crate::mesh::{Mesh, dist};
+use crate::mesh::{Mesh, dist, is_left};
 use nalgebra::{Point2, Point3, Vector2};
 use std::collections::BinaryHeap;
 
@@ -292,6 +292,113 @@ impl ICH {
 
     pub fn distance_to_point(&self, _face_id: usize, _position: Point3<f64>) -> f64 {
         unimplemented!()
+    }
+
+    pub fn path_to_vertex(&mut self, vertex_id: usize) -> Vec<Point3<f64>> {
+        let mut path = Vec::new();
+        let mut current_vertex = vertex_id;
+
+        while !self.vertex_infos[current_vertex].is_source {
+            let enter_edge_id = self.vertex_infos[current_vertex].enter_edge.unwrap();
+            if self.mesh.edges[enter_edge_id].start == current_vertex {
+                // the next point is a vertex
+                let next_vert = self.mesh.edges[enter_edge_id].end;
+                if !self.vertex_infos[next_vert].is_source {
+                    path.push(self.mesh.vertices[next_vert].position);
+                }
+            } else {
+                // the next point is on an edge
+                path.push(
+                    self.mesh
+                        .point_on_edge(enter_edge_id, self.split_infos[enter_edge_id].x),
+                );
+
+                // extract the opposite vertex
+                let mut opposite_vertex = self.mesh.edges[enter_edge_id].twin_edge.unwrap();
+                opposite_vertex = self.mesh.edges[opposite_vertex].next_edge;
+                opposite_vertex = self.mesh.edges[opposite_vertex].end;
+
+                // extract the lengths of the edges of the triangle
+                let l0 = self.mesh.edges[enter_edge_id].length;
+                let l1 = self.mesh.edges[self.mesh.edges[enter_edge_id].next_edge].length;
+                let l2 = self.mesh.edges
+                    [self.mesh.edges[self.mesh.edges[enter_edge_id].next_edge].next_edge]
+                    .length;
+
+                let x = (l1.powi(2) + l0.powi(2) - l2.powi(2)) / (2.0 * l0);
+                let mut last_point = Point2::new(x, -(l1.powi(2) - x.powi(2)).abs().sqrt());
+                let mut current_point = Point2::new(l0 - self.split_infos[enter_edge_id].x, 0.0);
+
+                // trace back to the pseudosource
+                let mut point_id = enter_edge_id;
+                while self.split_infos[point_id].p.unwrap() < self.mesh.vertices.len()
+                    && opposite_vertex != self.split_infos[point_id].p.unwrap()
+                    || self.split_infos[point_id].p.unwrap() >= self.mesh.vertices.len()
+                        && self.mesh.edges[self.mesh.edges[point_id].twin_edge.unwrap()].face
+                            != self.source_points[self.split_infos[point_id].p.unwrap()
+                                - self.mesh.vertices.len()]
+                            .0
+                {
+                    let e0 = self.mesh.edges[point_id].twin_edge.unwrap();
+                    let e1 = self.mesh.edges[e0].next_edge;
+                    let e2 = self.mesh.edges[e1].next_edge;
+
+                    let l0 = self.mesh.edges[enter_edge_id].length;
+                    let l1 = self.mesh.edges[e1].length;
+                    let l2 = self.mesh.edges[e2].length;
+
+                    let x = (l0.powi(2) + l2.powi(2) - l1.powi(2)) / (2.0 * l0);
+                    let opposite_vertex_2d = Point2::new(x, -(l1.powi(2) - x.powi(2)).abs().sqrt());
+
+                    if is_left(&opposite_vertex_2d, &last_point, &current_point) {
+                        let x = (l2.powi(2) + l1.powi(2) - l0.powi(2)) / (2.0 * l1);
+                        let p0 = Point2::new(x, -(l2.powi(2) - x.powi(2)).abs().sqrt());
+                        let p1 = Point2::new(l1, 0.0);
+
+                        let new_last_point = self.split_infos[enter_edge_id].x / l0 * p0.coords + (1.0 - self.split_infos[enter_edge_id].x / l0) * p1.coords;
+
+                        let pos = self.intersect(last_point, current_point, Point2::new(l0, 0.0), opposite_vertex_2d);
+                        let pos = (1.0 - pos) * l1;
+
+                        path.push(self.mesh.point_on_edge(e1, pos));
+                        point_id = e1;
+
+                        current_point = Point2::new(l1 - pos, 0.0);
+                        last_point = Point2::from(new_last_point);
+                    } else {
+                        let p0 = Point2::new(0.0, 0.0);
+                        let x = (l2.powi(2) + l0.powi(2) - l1.powi(2)) / (2.0 * l2);
+                        let p1 = Point2::new(x, -(l0.powi(2) - x.powi(2)).abs().sqrt());
+
+                        let new_last_point = self.split_infos[enter_edge_id].x / l0 * p0.coords + (1.0 - self.split_infos[enter_edge_id].x / l0) * p1.coords;
+
+                        let pos = self.intersect(last_point, current_point, opposite_vertex_2d, Point2::new(0.0, 0.0));
+                        let pos = (1.0 - pos) * l2;
+
+                        path.push(self.mesh.point_on_edge(e2, pos));
+                        point_id = e2;
+
+                        current_point = Point2::new(l2 - pos, 0.0);
+                        last_point = Point2::from(new_last_point);
+                    }
+
+                    // update the opposite vertex
+                    opposite_vertex = self.mesh.edges[point_id].twin_edge.unwrap();
+                    opposite_vertex = self.mesh.edges[self.mesh.edges[opposite_vertex].next_edge].end;
+                }
+
+                if self.vertex_infos[enter_edge_id].p.unwrap() >= self.mesh.vertices.len() {
+                    // current_vertex = self.split_infos[enter_edge_id].p.unwrap();
+                    break;
+                }
+                if self.vertex_infos[opposite_vertex].is_source {
+                    path.push(self.mesh.vertices[opposite_vertex].position);
+                }
+                current_vertex = opposite_vertex;
+            }
+        }
+
+        path
     }
 }
 
