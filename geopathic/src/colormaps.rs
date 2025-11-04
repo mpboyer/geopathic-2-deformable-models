@@ -18,8 +18,8 @@ pub fn random_colormap(manifold: &Manifold) -> Vec<[u8; 4]> {
 pub fn vertical_colormap(manifold: &Manifold) -> Vec<[u8; 4]> {
     let mut colormap = Vec::with_capacity(manifold.faces().len());
     // compute the lowest and highest y among vertices
-    let mut min_y = f32::MAX;
-    let mut max_y = f32::MIN;
+    let mut min_y = f64::MAX;
+    let mut max_y = f64::MIN;
     for vertex in manifold.vertices() {
         if vertex[1] < min_y {
             min_y = vertex[1];
@@ -45,11 +45,11 @@ pub fn vertical_colormap(manifold: &Manifold) -> Vec<[u8; 4]> {
 /// Create a colormap from distance values, mapping from purple (#7d1dd3) to yellow (#ffe500).
 /// The distance value for each face is the mean of its vertex distances.
 /// Infinite distances are colored grey.
-pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f32>) -> Vec<[u8; 4]> {
+pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>) -> Vec<[u8; 4]> {
     let mut colormap = Vec::with_capacity(manifold.faces().len());
 
     // Only keep finite distances for min/max calculation
-    let finite_distances: Vec<f32> = distances
+    let finite_distances: Vec<f64> = distances
         .iter()
         .cloned()
         .filter(|d| d.is_finite())
@@ -59,16 +59,16 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f32>) -> Vec<[
     let min_dist = finite_distances
         .iter()
         .cloned()
-        .fold(f32::INFINITY, f32::min);
+        .fold(f64::INFINITY, f64::min);
     let max_dist = finite_distances
         .iter()
         .cloned()
-        .fold(f32::NEG_INFINITY, f32::max);
+        .fold(f64::NEG_INFINITY, f64::max);
     let range = max_dist - min_dist;
 
     // Color endpoints: purple #7d1dd3 to yellow #ffe500
-    let color_start = [0xff as f32, 0x00 as f32, 0x00 as f32]; // Purple
-    let color_end = [0x00 as f32, 0xff as f32, 0x00 as f32]; // Yellow
+    let color_start = [0xff as f64, 0x00 as f64, 0x00 as f64]; // Purple
+    let color_end = [0x00 as f64, 0xff as f64, 0x00 as f64]; // Yellow
 
     for face in manifold.faces() {
         let (i, j, k) = *face;
@@ -100,11 +100,11 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f32>) -> Vec<[
 /// Returns a vector of paths based on iso values of the distances vector function
 pub fn iso_distances(
     manifold: &Manifold,
-    distances: &DVector<f32>,
-    threshold: f32,
-) -> Vec<(f32, Path)> {
+    distances: &DVector<f64>,
+    threshold: f64,
+) -> Vec<(f64, Path)> {
     let mut paths = Vec::new();
-    let mut grouped_indices: Vec<(f32, Vec<usize>)> = Vec::new();
+    let mut grouped_indices: Vec<(f64, Vec<usize>)> = Vec::new();
 
     for (index, &value) in distances.iter().enumerate() {
         match grouped_indices
@@ -130,27 +130,27 @@ pub fn iso_distances(
 }
 
 impl Viewer {
-    pub fn plot_curves(&mut self, paths: Vec<(f32, Path)>) {
+    pub fn plot_curves(&mut self, paths: Vec<(f64, Path)>) {
         let color_start = [0xff as f32, 0x00 as f32, 0x00 as f32]; // #ff0000
         let color_end = [0x00 as f32, 0xff as f32, 0x00 as f32]; // #00ff00
 
         let min_dist = paths
             .iter()
             .cloned()
-            .fold(f32::INFINITY, |acc, (v, _)| f32::min(v, acc));
+            .fold(f64::INFINITY, |acc, (v, _)| f64::min(v, acc));
         let max_dist = paths
             .iter()
             .cloned()
-            .fold(f32::NEG_INFINITY, |acc, (v, __)| f32::max(acc, v));
+            .fold(f64::NEG_INFINITY, |acc, (v, __)| f64::max(acc, v));
 
         for (dist, path) in paths.iter() {
             let mut plot = path.clone();
             plot.push(path[0].clone());
 
             let t = (dist - min_dist) / (max_dist - min_dist);
-            let r = color_start[0] + t * (color_end[0] - color_start[0]);
-            let g = color_start[1] + t * (color_end[1] - color_start[1]);
-            let b = color_start[2] + t * (color_end[2] - color_start[2]);
+            let r = color_start[0] + t as f32 * (color_end[0] - color_start[0]);
+            let g = color_start[1] + t as f32 * (color_end[1] - color_start[1]);
+            let b = color_start[2] + t as f32 * (color_end[2] - color_start[2]);
 
             let color = Some(Point3::from_slice(&[r, g, b]));
 

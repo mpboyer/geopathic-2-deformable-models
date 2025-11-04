@@ -3,7 +3,7 @@
 use nalgebra::DVector;
 
 /// Generic struct for N-D points.
-pub type Point = DVector<f32>;
+pub type Point = DVector<f64>;
 
 /// Triangle
 pub type Triangle = (usize, usize, usize);

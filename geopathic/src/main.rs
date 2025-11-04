@@ -47,11 +47,7 @@ fn ich() {
     println!("done.");
     ich.print_stats();
 
-    let distances = ich
-        .distances_to_vertices()
-        .iter()
-        .map(|&d| d as f32)
-        .collect();
+    let distances = ich.distances_to_vertices();
     let colormap = distance_colormap(&manifold, &DVector::from_vec(distances));
 
     // let path: Path = ich.path_to_vertex(100).iter().map(|p| DVector::from_vec(vec![p.x as f32, p.y as f32, p.z as f32])).collect();

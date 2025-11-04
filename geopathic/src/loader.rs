@@ -12,7 +12,8 @@ pub fn load_manifold(file_path: &str) -> Result<Manifold, obj::ObjError> {
     let mut faces: Vec<Triangle> = Vec::new();
 
     for vertex in object.data.position.iter() {
-        vertices.push(Point::from_row_slice(vertex));
+        // Hardcoded 3 dimensions
+        vertices.push(Point::from_iterator(3, vertex.iter().map(|&x| x as f64)));
     }
 
     for sub_obj in object.data.objects {

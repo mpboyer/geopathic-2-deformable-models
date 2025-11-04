@@ -1,10 +1,10 @@
-use core::f32;
+use core::f64;
 use std::collections::HashMap;
 
 use crate::manifold::{Manifold, Point};
 use nalgebra::{DMatrix, DVector};
 
-fn compute_cotangent(a: &Point, b: &Point) -> f32 {
+fn compute_cotangent(a: &Point, b: &Point) -> f64 {
     let dot = a.dot(b);
     let cross = a.cross(b);
     let cross_norm = cross.norm();
@@ -20,8 +20,8 @@ impl Manifold {
     fn compute_face_gradient(
         &self,
         face_idx: usize,
-        vertex_values: &DVector<f32>,
-    ) -> Result<DVector<f32>, String> {
+        vertex_values: &DVector<f64>,
+    ) -> Result<DVector<f64>, String> {
         let (i, j, k) = self.faces[face_idx];
 
         let v0 = &self.vertices[i];
@@ -56,7 +56,7 @@ impl Manifold {
         Ok(grad)
     }
 
-    fn compute_divergence(&self, face_vectors: &[DVector<f32>]) -> Result<DVector<f32>, String> {
+    fn compute_divergence(&self, face_vectors: &[DVector<f64>]) -> Result<DVector<f64>, String> {
         let n = self.vertices.len();
         let mut divergence = DVector::zeros(n);
 
@@ -90,7 +90,7 @@ impl Manifold {
 
 #[derive(Debug, Clone)]
 pub struct Laplacian {
-    pub laplace_matrix: DMatrix<f32>,
+    pub laplace_matrix: DMatrix<f64>,
     pub n_vertices: usize,
 }
 
@@ -99,7 +99,7 @@ impl Laplacian {
         let n_vertices = manifold.vertices().len();
         let mut laplace_matrix = DMatrix::zeros(n_vertices, n_vertices);
 
-        let mut edge_weights: HashMap<(usize, usize), f32> = HashMap::new();
+        let mut edge_weights: HashMap<(usize, usize), f64> = HashMap::new();
 
         for face in manifold.faces() {
             let (i, j, k) = *face;
@@ -121,7 +121,7 @@ impl Laplacian {
 
         // Set diagonal entries (sum of incident edge weights)
         for i in 0..n_vertices {
-            let row_sum: f32 = (0..n_vertices)
+            let row_sum: f64 = (0..n_vertices)
                 .filter(|&j| j != i)
                 .map(|j| -laplace_matrix[(i, j)])
                 .sum();
@@ -135,7 +135,7 @@ impl Laplacian {
     }
 
     fn add_cotangent_weight(
-        edge_weights: &mut HashMap<(usize, usize), f32>,
+        edge_weights: &mut HashMap<(usize, usize), f64>,
         i: usize,
         j: usize,
         _k: usize,
@@ -157,11 +157,11 @@ impl Laplacian {
         }
     }
 
-    pub fn apply(&self, u: &DVector<f32>) -> DVector<f32> {
+    pub fn apply(&self, u: &DVector<f64>) -> DVector<f64> {
         &self.laplace_matrix * u
     }
 
-    pub fn matrix(&self) -> &DMatrix<f32> {
+    pub fn matrix(&self) -> &DMatrix<f64> {
         &self.laplace_matrix
     }
 }
@@ -169,11 +169,11 @@ impl Laplacian {
 pub struct HeatMethod<'a> {
     manifold: &'a Manifold,
     pub laplace: Laplacian,
-    time_step: f32,
+    time_step: f64,
 }
 
 impl<'a> HeatMethod<'a> {
-    pub fn new(manifold: &'a Manifold, time_step: f32) -> Self {
+    pub fn new(manifold: &'a Manifold, time_step: f64) -> Self {
         Self {
             manifold,
             laplace: Laplacian::new(manifold),
@@ -181,7 +181,7 @@ impl<'a> HeatMethod<'a> {
         }
     }
 
-    pub fn compute_distance(&self, source: usize) -> Result<DVector<f32>, String> {
+    pub fn compute_distance(&self, source: usize) -> Result<DVector<f64>, String> {
         let n = self.manifold.vertices().len();
 
         // (I + t*L)u = δ_source
@@ -227,7 +227,7 @@ impl<'a> HeatMethod<'a> {
         Ok(distances)
     }
 
-    fn solve_linear_system(a: &DMatrix<f32>, b: &DVector<f32>) -> Result<DVector<f32>, String> {
+    fn solve_linear_system(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, String> {
         a.clone().lu().solve(b).ok_or_else(|| "CPT".to_string())
     }
 }
@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(laplace.matrix().ncols(), 4);
 
         for i in 0..4 {
-            let row_sum: f32 = (0..4).map(|j| laplace.matrix()[(i, j)]).sum();
+            let row_sum: f64 = (0..4).map(|j| laplace.matrix()[(i, j)]).sum();
             assert!(row_sum.abs() < 1e-5, "Row {} sum: {}", i, row_sum);
         }
     }

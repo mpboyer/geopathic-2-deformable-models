@@ -44,7 +44,11 @@ impl Viewer {
         let mut base_coords: Vec<Point3<f32>> = Vec::with_capacity(manifold.vertices.len());
         for i in 0..manifold.vertices.len() {
             let vertex = &manifold.vertices[i];
-            base_coords.push(Point3::new(vertex[0], vertex[1], vertex[2]));
+            base_coords.push(Point3::new(
+                vertex[0] as f32,
+                vertex[1] as f32,
+                vertex[2] as f32,
+            ));
         }
 
         // add the faces
@@ -116,14 +120,18 @@ impl Viewer {
         let scale = scale.unwrap_or(1.0);
         let mut source = self.window.add_sphere(0.02 * scale);
         source.set_color(1.0, 0.0, 0.0); // red marker
-        source.append_translation(&na::Translation3::new(path[0][0], path[0][1], path[0][2]));
+        source.append_translation(&na::Translation3::new(
+            path[0][0] as f32,
+            path[0][1] as f32,
+            path[0][2] as f32,
+        ));
 
         let mut target = self.window.add_sphere(0.02 * scale);
         target.set_color(0.0, 1.0, 0.0); // green marker
         target.append_translation(&na::Translation3::new(
-            path[path.len() - 1][0],
-            path[path.len() - 1][1],
-            path[path.len() - 1][2],
+            path[path.len() - 1][0] as f32,
+            path[path.len() - 1][1] as f32,
+            path[path.len() - 1][2] as f32,
         ));
 
         // add nodes to the viewer to handle rotation
@@ -136,8 +144,12 @@ impl Viewer {
             let p1 = &path[i + 1];
 
             // add a thin cylinder between p0 and p1
-            let dir = Vector3::new(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
-            let mut line = self.window.add_cylinder(0.005 * scale, dir.norm());
+            let dir = Vector3::new(
+                (p1[0] - p0[0]) as f32,
+                (p1[1] - p0[1]) as f32,
+                (p1[2] - p0[2]) as f32,
+            );
+            let mut line = self.window.add_cylinder(0.005 * scale, dir.norm() as f32);
 
             // set the color (argument of default)
             let (r, g, b) = match color {
@@ -148,11 +160,11 @@ impl Viewer {
 
             // set the position and orientation
             line.set_local_translation(na::Translation3::new(
-                p0[0] + dir[0] / 2.0,
-                p0[1] + dir[1] / 2.0,
-                p0[2] + dir[2] / 2.0,
+                p0[0] as f32 + dir[0] / 2.0,
+                p0[1] as f32 + dir[1] / 2.0,
+                p0[2] as f32 + dir[2] / 2.0,
             ));
-            let rotation = UnitQuaternion::rotation_between(&Vector3::y(), &dir.normalize())
+            let rotation = UnitQuaternion::rotation_between(&Vector3::<f32>::y(), &dir.normalize())
                 .unwrap_or(UnitQuaternion::identity());
             line.set_local_rotation(rotation);
 
