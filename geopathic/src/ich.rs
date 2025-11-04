@@ -331,27 +331,15 @@ impl ICH {
 
                 // trace back to the pseudosource
                 let mut point_id = enter_edge_id;
-                // while self.split_infos[enter_edge_id].p.unwrap() < self.mesh.vertices.len()
-                //     && opposite_vertex != self.split_infos[enter_edge_id].p.unwrap()
-                //     || self.split_infos[enter_edge_id].p.unwrap() >= self.mesh.vertices.len()
-                //         && self.mesh.edges[self.mesh.edges[enter_edge_id].twin_edge.unwrap()].face
-                //             != self.source_points[self.split_infos[enter_edge_id].p.unwrap()
-                //                 - self.mesh.vertices.len()]
-                //             .0
-                // {
+                let mut pos = self.split_infos[enter_edge_id].x;
                 loop {
                     match self.split_infos[enter_edge_id].p {
                         None => {
                             break;
                         }
                         Some(p_id) => {
-                            if p_id >= self.mesh.vertices.len()
-                                || opposite_vertex == p_id && p_id < self.mesh.vertices.len()
                             // TODO: handle source points
-                            // || self.mesh.edges[self.mesh.edges[point_id].twin_edge.unwrap()]
-                            //     .face
-                            //     == self.source_points[p_id - self.mesh.vertices.len()].0
-                            {
+                            if !(p_id < self.mesh.vertices.len() && opposite_vertex != p_id) {
                                 break;
                             }
                         }
@@ -373,16 +361,16 @@ impl ICH {
                         let p0 = Point2::new(x, -(l2.powi(2) - x.powi(2)).abs().sqrt());
                         let p1 = Point2::new(l1, 0.0);
 
-                        let new_last_point = self.split_infos[enter_edge_id].x / l0 * p0.coords
-                            + (1.0 - self.split_infos[enter_edge_id].x / l0) * p1.coords;
+                        let new_last_point = pos / l0 * p0.coords
+                            + (1.0 - pos / l0) * p1.coords;
 
-                        let pos = self.intersect(
+                        pos = self.intersect(
                             last_point,
                             current_point,
                             Point2::new(l0, 0.0),
                             opposite_vertex_2d,
                         );
-                        let pos = (1.0 - pos) * l1;
+                        pos = (1.0 - pos) * l1;
 
                         path.push(self.mesh.point_on_edge(e1, pos));
                         point_id = e1;
@@ -394,16 +382,16 @@ impl ICH {
                         let x = (l2.powi(2) + l0.powi(2) - l1.powi(2)) / (2.0 * l2);
                         let p1 = Point2::new(x, -(l0.powi(2) - x.powi(2)).abs().sqrt());
 
-                        let new_last_point = self.split_infos[enter_edge_id].x / l0 * p0.coords
-                            + (1.0 - self.split_infos[enter_edge_id].x / l0) * p1.coords;
+                        let new_last_point = pos / l0 * p0.coords
+                            + (1.0 - pos / l0) * p1.coords;
 
-                        let pos = self.intersect(
+                        pos = self.intersect(
                             last_point,
                             current_point,
                             opposite_vertex_2d,
                             Point2::new(0.0, 0.0),
                         );
-                        let pos = (1.0 - pos) * l2;
+                        pos = (1.0 - pos) * l2;
 
                         path.push(self.mesh.point_on_edge(e2, pos));
                         point_id = e2;
