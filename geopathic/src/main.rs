@@ -4,7 +4,6 @@ use geopathic::colormaps::{distance_colormap, iso_distances};
 use geopathic::edp::HeatMethod;
 use geopathic::ich::ICH;
 use geopathic::loader::load_manifold;
-// use geopathic::manifold::Path;
 use geopathic::mesh::Mesh;
 use geopathic::viewer::Viewer;
 use kiss3d::camera::ArcBall;
@@ -50,11 +49,15 @@ fn ich() {
     let distances = ich.distances_to_vertices();
     let colormap = distance_colormap(&manifold, &DVector::from_vec(distances));
 
-    // let path: Path = ich.path_to_vertex(100).iter().map(|p| DVector::from_vec(vec![p.x as f32, p.y as f32, p.z as f32])).collect();
+    // note: this does not work for 60
+    let path: Vec<DVector<f64>> = ich.path_to_vertex(10)
+        .iter()
+        .map(|p| DVector::from_vec(vec![p.x, p.y, p.z]))
+        .collect();
 
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
     viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
-    // viewer.draw_path(&path, Some(5.0), None);
+    viewer.draw_path(&path, Some(5.0), None);
     viewer.render(false);
 }
