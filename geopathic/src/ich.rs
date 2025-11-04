@@ -331,26 +331,26 @@ impl ICH {
 
                 // trace back to the pseudosource
                 let mut point_id = enter_edge_id;
-                // while self.split_infos[point_id].p.unwrap() < self.mesh.vertices.len()
-                //     && opposite_vertex != self.split_infos[point_id].p.unwrap()
-                //     || self.split_infos[point_id].p.unwrap() >= self.mesh.vertices.len()
-                //         && self.mesh.edges[self.mesh.edges[point_id].twin_edge.unwrap()].face
-                //             != self.source_points[self.split_infos[point_id].p.unwrap()
+                // while self.split_infos[enter_edge_id].p.unwrap() < self.mesh.vertices.len()
+                //     && opposite_vertex != self.split_infos[enter_edge_id].p.unwrap()
+                //     || self.split_infos[enter_edge_id].p.unwrap() >= self.mesh.vertices.len()
+                //         && self.mesh.edges[self.mesh.edges[enter_edge_id].twin_edge.unwrap()].face
+                //             != self.source_points[self.split_infos[enter_edge_id].p.unwrap()
                 //                 - self.mesh.vertices.len()]
                 //             .0
                 // {
                 loop {
-                    match self.split_infos[point_id].p {
+                    match self.split_infos[enter_edge_id].p {
                         None => {
                             break;
                         }
                         Some(p_id) => {
                             if p_id >= self.mesh.vertices.len()
                                 || opposite_vertex == p_id && p_id < self.mesh.vertices.len()
-                                // TODO: handle source points
-                                // || self.mesh.edges[self.mesh.edges[point_id].twin_edge.unwrap()]
-                                //     .face
-                                //     == self.source_points[p_id - self.mesh.vertices.len()].0
+                            // TODO: handle source points
+                            // || self.mesh.edges[self.mesh.edges[point_id].twin_edge.unwrap()]
+                            //     .face
+                            //     == self.source_points[p_id - self.mesh.vertices.len()].0
                             {
                                 break;
                             }
@@ -361,12 +361,12 @@ impl ICH {
                     let e1 = self.mesh.edges[e0].next_edge;
                     let e2 = self.mesh.edges[e1].next_edge;
 
-                    let l0 = self.mesh.edges[enter_edge_id].length;
+                    let l0 = self.mesh.edges[e0].length;
                     let l1 = self.mesh.edges[e1].length;
                     let l2 = self.mesh.edges[e2].length;
 
                     let x = (l0.powi(2) + l2.powi(2) - l1.powi(2)) / (2.0 * l0);
-                    let opposite_vertex_2d = Point2::new(x, -(l1.powi(2) - x.powi(2)).abs().sqrt());
+                    let opposite_vertex_2d = Point2::new(x, (l2.powi(2) - x.powi(2)).abs().sqrt());
 
                     if is_left(&opposite_vertex_2d, &last_point, &current_point) {
                         let x = (l2.powi(2) + l1.powi(2) - l0.powi(2)) / (2.0 * l1);
@@ -418,7 +418,9 @@ impl ICH {
                         self.mesh.edges[self.mesh.edges[opposite_vertex].next_edge].end;
                 }
 
-                if self.split_infos[enter_edge_id].p.is_none() || self.split_infos[enter_edge_id].p.unwrap() >= self.mesh.vertices.len() {
+                if self.split_infos[enter_edge_id].p.is_none()
+                    || self.split_infos[enter_edge_id].p.unwrap() >= self.mesh.vertices.len()
+                {
                     // current_vertex = self.split_infos[enter_edge_id].p.unwrap();
                     break;
                 }
