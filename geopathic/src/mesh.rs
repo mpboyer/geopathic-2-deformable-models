@@ -60,7 +60,7 @@ impl Mesh {
 
         // Iterate over the vertices in the manifold
         for v in &manifold.vertices {
-            let position = Point3::new(v[0] as f64, v[1] as f64, v[2] as f64);
+            let position = Point3::new(v[0], v[1], v[2]);
             vertices.push(Vertex {
                 position,
                 edges: Vec::new(),

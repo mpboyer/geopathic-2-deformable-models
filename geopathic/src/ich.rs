@@ -361,8 +361,7 @@ impl ICH {
                         let p0 = Point2::new(x, -(l2.powi(2) - x.powi(2)).abs().sqrt());
                         let p1 = Point2::new(l1, 0.0);
 
-                        let new_last_point = pos / l0 * p0.coords
-                            + (1.0 - pos / l0) * p1.coords;
+                        let new_last_point = pos / l0 * p0.coords + (1.0 - pos / l0) * p1.coords;
 
                         pos = self.intersect(
                             last_point,
@@ -382,8 +381,7 @@ impl ICH {
                         let x = (l2.powi(2) + l0.powi(2) - l1.powi(2)) / (2.0 * l2);
                         let p1 = Point2::new(x, -(l0.powi(2) - x.powi(2)).abs().sqrt());
 
-                        let new_last_point = pos / l0 * p0.coords
-                            + (1.0 - pos / l0) * p1.coords;
+                        let new_last_point = pos / l0 * p0.coords + (1.0 - pos / l0) * p1.coords;
 
                         pos = self.intersect(
                             last_point,
