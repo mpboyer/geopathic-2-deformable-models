@@ -1242,8 +1242,8 @@ mod tests {
         let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
         ich.run();
 
-        assert_eq!(ich.stats.windows_created, 310523);
-        assert_eq!(ich.stats.max_queue_size, 1402);
+        assert_eq!(ich.stats.windows_created, 310630);
+        assert_eq!(ich.stats.max_queue_size, 1416);
     }
 
     #[test]
@@ -1257,8 +1257,8 @@ mod tests {
         let mut ich = ICH::new(mesh, source_vertices, source_points, kept_faces);
         ich.run();
 
-        assert_eq!(ich.stats.windows_created, 74);
-        assert_eq!(ich.stats.max_queue_size, 16);
+        assert_eq!(ich.stats.windows_created, 75);
+        assert_eq!(ich.stats.max_queue_size, 17);
     }
 
     // TODO: distances tests

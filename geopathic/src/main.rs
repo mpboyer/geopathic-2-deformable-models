@@ -10,8 +10,8 @@ use kiss3d::camera::ArcBall;
 use nalgebra::{DVector, Point3};
 
 fn main() {
-    heat_method();
-    // ich();
+    // heat_method();
+    ich();
 }
 
 #[allow(dead_code)]
