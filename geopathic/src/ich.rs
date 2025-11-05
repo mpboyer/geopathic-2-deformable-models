@@ -303,9 +303,10 @@ impl ICH {
             if self.mesh.edges[enter_edge_id].start == current_vertex {
                 // the next point is a vertex
                 let next_vert = self.mesh.edges[enter_edge_id].end;
-                if !self.vertex_infos[next_vert].is_source {
-                    path.push(self.mesh.vertices[next_vert].position);
-                }
+                // if !self.vertex_infos[next_vert].is_source {
+                path.push(self.mesh.vertices[next_vert].position);
+                // }
+                current_vertex = next_vert;
             } else {
                 // the next point is on an edge
                 path.push(
@@ -410,12 +411,15 @@ impl ICH {
                     // current_vertex = self.split_infos[enter_edge_id].p.unwrap();
                     break;
                 }
-                if self.vertex_infos[opposite_vertex].is_source {
-                    path.push(self.mesh.vertices[opposite_vertex].position);
-                }
+                // if !self.vertex_infos[opposite_vertex].is_source {
+                path.push(self.mesh.vertices[opposite_vertex].position);
+                // }
                 current_vertex = opposite_vertex;
             }
         }
+
+        path.reverse();
+        path.push(self.mesh.vertices[vertex_id].position);
 
         path
     }

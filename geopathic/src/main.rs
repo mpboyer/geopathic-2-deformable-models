@@ -33,7 +33,7 @@ fn heat_method() {
 
 #[allow(dead_code)]
 fn ich() {
-    let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+    let manifold = load_manifold("../examples/models/pyramid.obj").unwrap();
     print!("Converting to mesh...");
     std::io::stdout().flush().unwrap();
     let mesh = Mesh::from_manifold(&manifold);
@@ -49,15 +49,19 @@ fn ich() {
     let distances = ich.distances_to_vertices();
     let colormap = distance_colormap(&manifold, &DVector::from_vec(distances));
 
-    // note: this does not work for 60
-    let path: Vec<DVector<f64>> = ich.path_to_vertex(10)
-        .iter()
-        .map(|p| DVector::from_vec(vec![p.x, p.y, p.z]))
-        .collect();
-
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
     viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
-    viewer.draw_path(&path, Some(5.0), None);
+
+    for dest in 1..manifold.vertices().len() {
+        let path: Vec<DVector<f64>> = ich
+            .path_to_vertex(dest)
+            .iter()
+            .map(|p| DVector::from_vec(vec![p.x, p.y, p.z]))
+            .collect();
+        viewer.draw_path(&path, Some(5.0), None);
+    }
+
+    println!("Rendering...");
     viewer.render(false);
 }
