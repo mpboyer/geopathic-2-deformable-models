@@ -448,7 +448,7 @@ impl ICH {
                 if edge.length < self.vertex_infos[opposite_vertex_id].distance {
                     self.vertex_infos[opposite_vertex_id].birth_time = Some(0);
                     self.vertex_infos[opposite_vertex_id].distance = edge.length;
-                    self.vertex_infos[opposite_vertex_id].enter_edge = Some(next_edge_id);
+                    self.vertex_infos[opposite_vertex_id].enter_edge = edge.twin_edge;
                     self.vertex_infos[opposite_vertex_id].p = Some(*source);
                     self.vertex_infos[opposite_vertex_id].s = Some(*source);
 
