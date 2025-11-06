@@ -33,10 +33,11 @@ fn heat_method() {
 
 #[allow(dead_code)]
 fn ich() {
-    let manifold = load_manifold("../examples/models/pyramid.obj").unwrap();
+    let manifold = load_manifold("../examples/models/20_icosahedron.obj").unwrap();
     print!("Converting to mesh...");
     std::io::stdout().flush().unwrap();
     let mesh = Mesh::from_manifold(&manifold);
+    mesh.check_topology().unwrap();
     println!("done.");
 
     print!("Running ICH...");
@@ -51,7 +52,7 @@ fn ich() {
 
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
-    viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
+    // viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
 
     for dest in 1..manifold.vertices().len() {
         let path: Vec<DVector<f64>> = ich

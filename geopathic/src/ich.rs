@@ -430,6 +430,10 @@ impl ICH {
 
         path
     }
+
+    pub fn vertex_info(&self, vertex_id: usize) -> &VertexInfo {
+        &self.vertex_infos[vertex_id]
+    }
 }
 
 impl ICH {
@@ -1045,13 +1049,13 @@ impl ICHStats {
 
 /// Information about each vertex during the ICH algorithm.
 #[derive(Debug, Clone)]
-struct VertexInfo {
-    birth_time: Option<usize>,
-    distance: f64,
-    enter_edge: Option<usize>,
-    is_source: bool,
-    p: Option<usize>,
-    s: Option<usize>,
+pub struct VertexInfo {
+    pub birth_time: Option<usize>,
+    pub distance: f64,
+    pub enter_edge: Option<usize>,
+    pub is_source: bool,
+    pub p: Option<usize>,
+    pub s: Option<usize>,
 }
 
 impl VertexInfo {
@@ -1064,6 +1068,12 @@ impl VertexInfo {
             p: None,
             s: None,
         }
+    }
+}
+
+impl Default for VertexInfo {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
