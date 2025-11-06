@@ -276,6 +276,13 @@ impl ICH {
                 self.generate_sub_windows(&pseudo_win);
             }
         }
+
+        // compute infinite distances
+        for info in &self.vertex_infos {
+            if info.distance == f64::INFINITY {
+                self.stats.infinite_distance();
+            }
+        }
     }
 
     pub fn print_stats(&self) {
@@ -566,7 +573,7 @@ impl ICH {
         let inter_x = v2.x - v2.y * (v2.x - source_2d.x) / (v2.y - source_2d.y);
 
         // only right child window
-        let (left_win, right_win) = if inter_x <= left.x {
+        /*let (left_win, right_win) = if inter_x <= left.x {
             // compute the window
             let t0 = self.intersect(source_2d, left, v2, v1);
             let t1 = self.intersect(source_2d, right, v2, v1);
@@ -600,9 +607,9 @@ impl ICH {
 
             // return only left window
             (Some(left_win), None)
-        }
+        }*/
         // both child windows
-        else {
+        let (left_win, right_win) = {
             let opposite_vertex = self.mesh.edges[e1].end;
             let direct_distance = (v2 - source_2d).norm();
 
@@ -942,6 +949,7 @@ impl ICH {
 
     /// Checks if a window is valid based on ICH's filters.
     fn is_valid_window(&self, window: &Window, is_left: bool) -> bool {
+        return true;
         // degenerate window
         if window.b1 <= window.b0 {
             return false;
@@ -1002,6 +1010,7 @@ pub struct ICHStats {
     pub max_queue_size: usize,
     pub max_pseudo_queue_size: usize,
     pub iterations: usize,
+    pub infinite_distances: usize,
 }
 
 impl ICHStats {
@@ -1027,6 +1036,10 @@ impl ICHStats {
 
     pub fn iteration(&mut self) {
         self.iterations += 1;
+    }
+
+    pub fn infinite_distance(&mut self) {
+        self.infinite_distances += 1;
     }
 }
 

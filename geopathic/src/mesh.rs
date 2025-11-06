@@ -167,6 +167,38 @@ impl Mesh {
         let v_end = &self.vertices[edge.end].position;
         v_start + (v_end - v_start) * t / edge.length
     }
+
+    pub fn check_topology(&self) -> Result<(), String> {
+        // every non-boundary edge has exactly one twin and twin.twin == e
+        for (e, edge) in self.edges.iter().enumerate() {
+            if let Some(t) = edge.twin_edge {
+                if t >= self.edges.len() {
+                    return Err(format!("twin index out of range for edge {}", e));
+                }
+                let t2 = self.edges[t].twin_edge.expect("twin.twin missing");
+                if t2 != e {
+                    return Err(format!("twin.twin != self at edge {}", e));
+                }
+            }
+        }
+
+        // every face must have a 3-cycle: next_edge^3 returns starting edge
+        for (f, face) in self.faces.iter().enumerate() {
+            for &start_edge in &face.edges {
+                let e1 = self.edges[start_edge].next_edge;
+                let e2 = self.edges[e1].next_edge;
+                let e3 = self.edges[e2].next_edge;
+                if e3 != start_edge {
+                    return Err(format!(
+                        "face {} has broken next_edge cycle at edge {}",
+                        f, start_edge
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Compute the Euclidean distance between two 3D points
