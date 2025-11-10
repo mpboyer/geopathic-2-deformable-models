@@ -1,8 +1,11 @@
+/// Module computing geodesics based on different PDEs
 use core::f64;
+use nalgebra::{DMatrix, DVector};
 use std::collections::HashMap;
 
-use crate::manifold::{Manifold, Point};
-use nalgebra::{DMatrix, DVector};
+use crate::manifold::{self, Manifold, Point};
+
+// Laplace-Beltrami operator based methods
 
 fn compute_cotangent(a: &Point, b: &Point) -> f64 {
     let dot = a.dot(b);
@@ -88,6 +91,7 @@ impl Manifold {
     }
 }
 
+/// Structure used for computing the laplacian of a manifold, as its matrix
 #[derive(Debug, Clone)]
 pub struct Laplacian {
     pub laplace_matrix: DMatrix<f64>,
@@ -187,48 +191,44 @@ impl<'a> HeatMethod<'a> {
         // (I + t*L)u = δ_source
         let identity = DMatrix::identity(n, n);
         let heat_matrix = &identity + &self.laplace.laplace_matrix * self.time_step;
-        // dbg!(&self.laplace.laplace_matrix);
-        // dbg!(&heat_matrix);
 
         let mut rhs = DVector::zeros(n);
         rhs[source] = 1.0;
-        // dbg!(&rhs);
 
         let u = Self::solve_linear_system(&heat_matrix, &rhs)?;
-        // dbg!(&u);
 
         // X = -∇u / |∇u|
         let mut face_gradients = Vec::new();
 
         for face_idx in 0..self.manifold.faces().len() {
             let gradient = self.manifold.compute_face_gradient(face_idx, &u)?;
-            // dbg!(&gradient);
 
             let grad_norm = gradient.norm();
-            let normalized_grad = if grad_norm > 1e-6 {
+            let normalized_grad = if grad_norm > 1e-10 {
                 -gradient / grad_norm
             } else {
                 DVector::zeros(3)
             };
-            // dbg!(&normalized_grad);
             face_gradients.push(normalized_grad);
         }
 
         // Solve Poisson equation L*φ = ∇·X
         let divergence_x = self.manifold.compute_divergence(&face_gradients)?;
 
-        let regularization = 0.0;
+        let regularization = 1e-4;
         let regularized_laplacian = &self.laplace.laplace_matrix + &identity * regularization;
 
         let phi = Self::solve_linear_system(&regularized_laplacian, &divergence_x)?;
         let distances = phi.map(|x| x - phi[source]);
-        dbg!(&distances);
+        println!("{}", &distances);
 
         Ok(distances)
     }
 
     fn solve_linear_system(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, String> {
-        a.clone().lu().solve(b).ok_or_else(|| "CPT".to_string())
+        a.clone().lu().solve(b).ok_or_else(|| {
+            "Failed to solve linear system. Matrix may be ill-conditioned.".to_string()
+        })
     }
 }
 
