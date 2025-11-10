@@ -149,7 +149,7 @@ impl Viewer {
                 (p1[1] - p0[1]) as f32,
                 (p1[2] - p0[2]) as f32,
             );
-            let mut line = self.window.add_cylinder(0.005 * scale, dir.norm() as f32);
+            let mut line = self.window.add_cylinder(0.005 * scale, dir.norm());
 
             // set the color (argument of default)
             let (r, g, b) = match color {
