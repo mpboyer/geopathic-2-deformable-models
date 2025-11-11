@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 use image::{DynamicImage, GenericImage};
 
-use crate::manifold::{Manifold, Path};
+use crate::manifold::{Manifold, Path, Point};
 
 pub struct Viewer {
     pub window: Window,
@@ -117,6 +117,10 @@ impl Viewer {
     }
 
     pub fn draw_path(&mut self, path: &Path, scale: Option<f32>, color: Option<Point3<f32>>) {
+        if path.len() <= 2 && (path[0] == path[path.len() - 1]) {
+            return self.draw_point(path[0].clone(), scale, color);
+        }
+
         let scale = scale.unwrap_or(1.0);
         let mut source = self.window.add_sphere(0.02 * scale);
         source.set_color(1.0, 0.0, 0.0); // red marker
@@ -171,6 +175,24 @@ impl Viewer {
             // add to the viewer nodes to handle rotation
             self.nodes.push(line);
         }
+    }
+
+    pub fn draw_point(&mut self, point: Point, scale: Option<f32>, color: Option<Point3<f32>>) {
+        // set the color (argument of default)
+        let (r, g, b) = match color {
+            Some(c) => (c[0], c[1], c[2]),
+            None => (0.0, 0.0, 1.0),
+        };
+        let scale = scale.unwrap_or(1.0);
+        let mut source = self.window.add_sphere(0.02 * scale);
+        source.set_color(r, g, b); // red marker
+        source.append_translation(&na::Translation3::new(
+            point[0] as f32,
+            point[1] as f32,
+            point[2] as f32,
+        ));
+
+        self.nodes.push(source);
     }
 
     /// Launches the render loop.
