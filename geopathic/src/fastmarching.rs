@@ -80,6 +80,9 @@ impl<'a> FastMarching<'a> {
             }
         }
 
+        // dbg!(&states);
+        // dbg!(&distances);
+
         // Fast Marching main loop
         while let Some(trial) = heap.pop() {
             let v = trial.vertex;
@@ -99,6 +102,7 @@ impl<'a> FastMarching<'a> {
                     self.update_vertex_from_face(face, v, &mut distances, &mut states, &mut heap)?;
                 }
             }
+            // dbg!(&states, &distances, &heap);
         }
 
         Ok(DVector::from_vec(distances))
@@ -164,18 +168,18 @@ impl<'a> FastMarching<'a> {
             let v2 = others[1];
 
             // Compute new distance using eikonal equation
-            if let Some(new_dist) = self.solve_eikonal_on_triangle(target, v1, v2, distances)? {
-                if new_dist < distances[target] {
-                    distances[target] = new_dist;
+            let Some(new_dist) = self.solve_eikonal_on_triangle(target, v1, v2, distances)? else {
+                continue;
+            };
 
-                    if states[target] == VertexState::Far {
-                        states[target] = VertexState::Trial;
-                    }
-
-                    heap.push(TrialVertex {
-                        vertex: target,
-                        distance: new_dist,
-                    });
+            if new_dist < distances[target] {
+                heap.push(TrialVertex {
+                    vertex: target,
+                    distance: new_dist,
+                });
+                distances[target] = new_dist;
+                if states[target] == VertexState::Far {
+                    states[target] = VertexState::Trial;
                 }
             }
         }
@@ -185,70 +189,124 @@ impl<'a> FastMarching<'a> {
 
     /// Solve the eikonal equation on a triangle to find distance at target
     /// Given distances at v1 and v2, find distance at target
+    /// See https://www.cis.upenn.edu/~cis6100/Kimmel-Sethian-geodesics-98.pdf
     fn solve_eikonal_on_triangle(
         &self,
-        target: usize,
-        v1: usize,
-        v2: usize,
+        target: usize, // Vertex C
+        v1: usize,     // Vertex A
+        v2: usize,     // Vertex B
         distances: &[f64],
     ) -> Result<Option<f64>, String> {
-        let d1 = distances[v1];
-        let d2 = distances[v2];
+        // Get known distances at A and B
+        let distance_a = distances[v1]; // T(A)
+        let distance_b = distances[v2]; // T(B)
 
-        // If either distance is infinite, use one-sided update
-        if d1.is_infinite() && d2.is_infinite() {
+        // Need at least one known distance
+        if distance_a.is_infinite() && distance_b.is_infinite() {
             return Ok(None);
         }
 
-        let p_target = &self.manifold.vertices()[target];
-        let p1 = &self.manifold.vertices()[v1];
-        let p2 = &self.manifold.vertices()[v2];
+        // Get vertex positions
+        let point_c = &self.manifold.vertices()[target]; // Point C (target)
+        let point_a = &self.manifold.vertices()[v1]; // Point A
+        let point_b = &self.manifold.vertices()[v2]; // Point B
+        // C = 1, 1, 0
+        // B = 1, 0, 0
+        // A = 0, 0, 0
 
-        // Edge lengths
-        let a = (p2 - p_target).norm(); // opposite to v1
-        let b = (p1 - p_target).norm(); // opposite to v2
-        let c = (p2 - p1).norm(); // opposite to target
+        // Edge lengths from paper's notation
+        let a = (point_b - point_c).norm(); // |BC|
+        let b = (point_a - point_c).norm(); // |AC|
+        let c = (point_b - point_a).norm(); // |AB|
 
-        // If one distance is infinite, use simple update
-        if d1.is_infinite() {
-            return Ok(Some(d2 + a));
+        // One-sided updates if only one distance is known
+        if distance_a.is_infinite() {
+            return Ok(Some(distance_b + a));
         }
-        if d2.is_infinite() {
-            return Ok(Some(d1 + b));
+        if distance_b.is_infinite() {
+            return Ok(Some(distance_a + b));
         }
 
-        // Use law of cosines to find angle at target
-        let cos_angle = (a * a + b * b - c * c) / (2.0 * a * b);
-        let cos_angle = cos_angle.clamp(-1.0, 1.0); // Clamp for numerical stability
+        // Speed F = 1 for geodesic distance
+        let f = 1.0;
 
-        // Solve quadratic equation for distance
-        // Based on the eikonal equation |∇φ| = 1
-        let dd = d1 - d2;
-        let discriminant = a * a + b * b - 2.0 * a * b * cos_angle - dd * dd;
+        // Difference in known distances: u = T(B) - T(A)
+        let u = distance_b - distance_a;
+
+        // Compute angle θ at vertex C using law of cosines
+        // cos(θ) = (a² + b² - c²) / (2ab)
+        let cos_theta = (a * a + b * b - c * c) / (2.0 * a * b);
+        let cos_theta = cos_theta.clamp(-1.0, 1.0);
+        let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+        dbg!(sin_theta);
+
+        // Check if triangle is non-obtuse at C (required for the method)
+        // If θ > 90°, cannot do two-sided update from within triangle
+        if cos_theta <= 0.0 {
+            // Fall back to one-sided update
+            return Ok(Some((distance_a + b).min(distance_b + a)));
+        }
+
+        // Solve the quadratic equation (Eq. 4 from the paper):
+        // (a² + b² - 2ab cos θ)t² + 2bu(a cos θ - b)t + b²(u² - F²a² sin² θ) = 0
+        //
+        // Coefficients:
+        let a_coef = a * a + b * b - 2.0 * a * b * cos_theta;
+        let b_coef = 2.0 * b * u * (a * cos_theta - b);
+        let c_coef = b * b * (u * u - f * f * a * a * sin_theta * sin_theta);
+
+        if a_coef.abs() < 1e-12 {
+            // Degenerate case
+            return Ok(Some((distance_a + b).min(distance_b + a)));
+        }
+
+        // Solve quadratic: At² + Bt + C = 0
+        let discriminant = b_coef * b_coef - 4.0 * a_coef * c_coef;
 
         if discriminant < 0.0 {
-            // No solution from both vertices, use one-sided update
-            return Ok(Some(d1.min(d2) + a.min(b)));
+            // No real solution - fall back to one-sided update
+            return Ok(Some((distance_a + b).min(distance_b + a)));
         }
 
-        // Two possible solutions, take the one that gives larger distance
-        // (corresponding to positive slope)
-        let sin_angle = (1.0 - cos_angle * cos_angle).sqrt();
-        let numerator = a * d2 + b * d1 + (a * b * sin_angle * discriminant.sqrt());
-        let denominator = a * a + b * b - 2.0 * a * b * cos_angle;
+        // Take solution that gives t > u (upwind condition)
+        // t = (-B ± √discriminant) / (2A)
+        let sqrt_disc = discriminant.sqrt();
+        let t1 = (-b_coef + sqrt_disc) / (2.0 * a_coef);
+        let t2 = (-b_coef - sqrt_disc) / (2.0 * a_coef);
 
-        if denominator.abs() < 1e-10 {
-            return Ok(Some(d1.min(d2) + a.min(b)));
+        // Choose solution that satisfies u < t
+        let t = if t1 > u && t2 > u {
+            t1.min(t2) // Both valid, take smaller
+        } else if t1 > u {
+            t1
+        } else if t2 > u {
+            t2
+        } else {
+            // Neither solution satisfies causality
+            return Ok(Some((distance_a + b).min(distance_b + a)));
+        };
+
+        // Verify that update comes from within the triangle (Eq. 5 from paper):
+        // a cos θ < b(t - u)/t < a / cos θ
+        let ratio = b * (t - u) / t;
+        let lower_bound = a * cos_theta;
+        let upper_bound = a / cos_theta;
+
+        if ratio <= lower_bound || ratio >= upper_bound {
+            // Update is not from within the triangle
+            // Fall back to one-sided update using edge with smaller distance
+            return Ok(Some((distance_a + b).min(distance_b + a)));
         }
 
-        let d_new = numerator / denominator;
+        // Final distance: T(C) = T(A) + t
+        let distance_c = distance_a + t;
 
-        // Causality check: new distance should be larger than both known distances
-        if d_new < d1.max(d2) {
-            return Ok(Some(d1.min(d2) + a.min(b)));
+        // Causality check: new distance must be greater than both known distances
+        if distance_c <= distance_a.max(distance_b) {
+            return Ok(Some((distance_a + b).min(distance_b + a)));
         }
 
-        Ok(Some(d_new))
+        Ok(Some(distance_c))
     }
 }
 
