@@ -11,8 +11,8 @@ use kiss3d::camera::ArcBall;
 use nalgebra::{DVector, Point3};
 
 fn main() {
-    // heat_method();
-    fast_marching();
+    heat_method();
+    // fast_marching();
     // ich();
 }
 
@@ -20,7 +20,9 @@ fn main() {
 fn heat_method() {
     let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
     let heat_method = HeatMethod::new(&manifold, 0.5);
-    let distances = match heat_method.compute_distance(0) {
+
+    let sources = [0, 431];
+    let distances = match heat_method.compute_distance(sources) {
         Ok(it) => it,
         Err(err) => panic!("{}", err),
     };
@@ -29,24 +31,7 @@ fn heat_method() {
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
     viewer.plot_curves(iso_distances(&manifold, &distances, 1e-6));
-    viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
-    viewer.render(true);
-}
 
-#[allow(dead_code)]
-fn fast_marching() {
-    let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
-    let fastmarching = FastMarching::new(&manifold);
-    let sources = [0, 33];
-    let distances = match fastmarching.compute_distance(sources) {
-        Ok(it) => it,
-        Err(err) => panic!("{}", err),
-    };
-    dbg!(&distances);
-    let colormap = distance_colormap(&manifold, &distances);
-
-    let mut viewer = Viewer::new();
-    viewer.add_manifold(&manifold, Some(colormap));
     for s in sources {
         viewer.draw_point(
             manifold.vertices()[s].clone(),
@@ -55,7 +40,33 @@ fn fast_marching() {
         );
     }
 
+    viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
+    viewer.render(true);
+}
+
+#[allow(dead_code)]
+fn fast_marching() {
+    let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+    let fastmarching = FastMarching::new(&manifold);
+    let sources = [0, 431];
+    let distances = match fastmarching.compute_distance(sources) {
+        Ok(it) => it,
+        Err(err) => panic!("{}", err),
+    };
+    let colormap = distance_colormap(&manifold, &distances);
+
+    let mut viewer = Viewer::new();
+    viewer.add_manifold(&manifold, Some(colormap));
     viewer.plot_curves(iso_distances(&manifold, &distances, 1e-6));
+
+    for s in sources {
+        viewer.draw_point(
+            manifold.vertices()[s].clone(),
+            Some(10.0),
+            Some(Point3::from_slice(&[0.0, 0.0, 1.0])),
+        );
+    }
+
     viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
     viewer.render(true);
 }

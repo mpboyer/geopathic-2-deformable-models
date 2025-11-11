@@ -3,7 +3,8 @@ use core::f64;
 use nalgebra::{DMatrix, DVector};
 use std::collections::HashMap;
 
-use crate::manifold::{self, Manifold, Point};
+use crate::manifold::{Manifold, Point};
+use crate::sources::Sources;
 
 // Laplace-Beltrami operator based methods
 
@@ -185,15 +186,34 @@ impl<'a> HeatMethod<'a> {
         }
     }
 
-    pub fn compute_distance(&self, source: usize) -> Result<DVector<f64>, String> {
+    pub fn compute_distance<S: Into<Sources>>(&self, sources: S) -> Result<DVector<f64>, String> {
+        let sources = sources.into();
+        self.compute_distance_impl(&sources.0)
+    }
+
+    fn compute_distance_impl(&self, sources: &[usize]) -> Result<DVector<f64>, String> {
         let n = self.manifold.vertices().len();
+
+        // Validate sources
+        for &source in sources {
+            if source >= n {
+                return Err(format!(
+                    "Source vertex {} out of bounds (max: {})",
+                    source,
+                    n - 1
+                ));
+            }
+        }
 
         // (I + t*L)u = δ_source
         let identity = DMatrix::identity(n, n);
         let heat_matrix = &identity + &self.laplace.laplace_matrix * self.time_step;
 
         let mut rhs = DVector::zeros(n);
-        rhs[source] = 1.0;
+
+        for &source in sources {
+            rhs[source] = 1.0;
+        }
 
         let u = Self::solve_linear_system(&heat_matrix, &rhs)?;
 
@@ -219,8 +239,15 @@ impl<'a> HeatMethod<'a> {
         let regularized_laplacian = &self.laplace.laplace_matrix + &identity * regularization;
 
         let phi = Self::solve_linear_system(&regularized_laplacian, &divergence_x)?;
-        let distances = phi.map(|x| x - phi[source]);
-        println!("{}", &distances);
+
+        // For multiple sources, shift so that the minimum distance at sources is 0
+        let min_phi_at_sources = sources
+            .iter()
+            .map(|&s| phi[s])
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(0.0);
+        let distances = phi.map(|x| x - min_phi_at_sources);
+        // println!("{}", &distances);
 
         Ok(distances)
     }
@@ -256,6 +283,38 @@ mod tests {
         for i in 0..4 {
             let row_sum: f64 = (0..4).map(|j| laplace.matrix()[(i, j)]).sum();
             assert!(row_sum.abs() < 1e-5, "Row {} sum: {}", i, row_sum);
+        }
+    }
+
+    #[test]
+    fn test_heat_method_multiple_sources() {
+        let vertices = vec![
+            DVector::from_vec(vec![0.0, 0.0, 0.0]),
+            DVector::from_vec(vec![1.0, 0.0, 0.0]),
+            DVector::from_vec(vec![1.0, 1.0, 0.0]),
+            DVector::from_vec(vec![0.0, 1.0, 0.0]),
+        ];
+
+        let faces = vec![(0, 1, 2), (0, 2, 3)];
+
+        let manifold = Manifold::new(vertices, faces);
+        let heat = HeatMethod::new(&manifold, 0.01);
+
+        // Test with multiple sources
+        let distances = heat.compute_distance(vec![0, 2]).unwrap();
+
+        println!("Multiple source distances (heat method): {:?}", distances);
+
+        // Both sources should have zero or near-zero distance
+        assert!(distances[0].abs() < 1e-2, "Source 0 distance should be ~0");
+        assert!(distances[2].abs() < 1e-2, "Source 2 distance should be ~0");
+
+        // Test with array syntax
+        let distances2 = heat.compute_distance([0, 2]).unwrap();
+
+        // Distances should be similar (may not be exact due to numerical methods)
+        for i in 0..4 {
+            assert!((distances[i] - distances2[i]).abs() < 1e-6);
         }
     }
 }
