@@ -37,14 +37,24 @@ fn heat_method() {
 fn fast_marching() {
     let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
     let fastmarching = FastMarching::new(&manifold);
-    let distances = match fastmarching.compute_distance(0) {
+    let sources = [0, 33];
+    let distances = match fastmarching.compute_distance(sources) {
         Ok(it) => it,
         Err(err) => panic!("{}", err),
     };
+    dbg!(&distances);
     let colormap = distance_colormap(&manifold, &distances);
 
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
+    for s in sources {
+        viewer.draw_point(
+            manifold.vertices()[s].clone(),
+            Some(10.0),
+            Some(Point3::from_slice(&[0.0, 0.0, 1.0])),
+        );
+    }
+
     viewer.plot_curves(iso_distances(&manifold, &distances, 1e-6));
     viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
     viewer.render(true);

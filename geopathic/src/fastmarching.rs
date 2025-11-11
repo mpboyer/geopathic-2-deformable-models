@@ -5,6 +5,7 @@ use std::{cmp::Ordering, collections::BinaryHeap};
 use nalgebra::DVector;
 
 use crate::manifold::Manifold;
+use crate::sources::Sources;
 
 /// State of vertex during fast marching (basically adapted Dijkstra)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,38 +52,53 @@ impl<'a> FastMarching<'a> {
 
     /// Compute geodesic distance from a source vertex using Fast Marching Method
     /// Based on Kimmel & Sethian (1998)
-    pub fn compute_distance(&self, source: usize) -> Result<DVector<f64>, String> {
+    pub fn compute_distance<S: Into<Sources>>(&self, sources: S) -> Result<DVector<f64>, String> {
+        let sources = sources.into();
+        self.compute_distance_impl(&sources.0)
+    }
+
+    pub fn compute_distance_impl(&self, sources: &[usize]) -> Result<DVector<f64>, String> {
         let n = self.manifold.vertices().len();
+
+        // Validate sources
+        for &source in sources {
+            if source >= n {
+                return Err(format!(
+                    "Source vertex {} out of bounds (max: {})",
+                    source,
+                    n - 1
+                ));
+            }
+        }
 
         // Initialize distances and states
         let mut distances = vec![f64::INFINITY; n];
         let mut states = vec![VertexState::Far; n];
         let mut heap = BinaryHeap::new();
 
-        // Set source
-        distances[source] = 0.0;
-        states[source] = VertexState::Alive;
-
-        // Initialize direct neighbors of source with edge distances
-        for face in self.manifold.faces() {
-            let (i, j, k) = *face;
-
-            // Check each edge in the face
-            if i == source {
-                self.init_neighbor(source, j, &mut distances, &mut states, &mut heap);
-                self.init_neighbor(source, k, &mut distances, &mut states, &mut heap);
-            } else if j == source {
-                self.init_neighbor(source, i, &mut distances, &mut states, &mut heap);
-                self.init_neighbor(source, k, &mut distances, &mut states, &mut heap);
-            } else if k == source {
-                self.init_neighbor(source, i, &mut distances, &mut states, &mut heap);
-                self.init_neighbor(source, j, &mut distances, &mut states, &mut heap);
-            }
+        // Set all sources to distance 0 and alive
+        for &source in sources {
+            distances[source] = 0.0;
+            states[source] = VertexState::Alive;
         }
 
-        // dbg!(&states);
-        // dbg!(&distances);
+        for &source in sources {
+            for face in self.manifold.faces() {
+                let (i, j, k) = *face;
 
+                // Check each edge in the face
+                if i == source {
+                    self.init_neighbor(source, j, &mut distances, &mut states, &mut heap);
+                    self.init_neighbor(source, k, &mut distances, &mut states, &mut heap);
+                } else if j == source {
+                    self.init_neighbor(source, i, &mut distances, &mut states, &mut heap);
+                    self.init_neighbor(source, k, &mut distances, &mut states, &mut heap);
+                } else if k == source {
+                    self.init_neighbor(source, i, &mut distances, &mut states, &mut heap);
+                    self.init_neighbor(source, j, &mut distances, &mut states, &mut heap);
+                }
+            }
+        }
         // Fast Marching main loop
         while let Some(trial) = heap.pop() {
             let v = trial.vertex;
@@ -102,7 +118,6 @@ impl<'a> FastMarching<'a> {
                     self.update_vertex_from_face(face, v, &mut distances, &mut states, &mut heap)?;
                 }
             }
-            // dbg!(&states, &distances, &heap);
         }
 
         Ok(DVector::from_vec(distances))
@@ -238,7 +253,6 @@ impl<'a> FastMarching<'a> {
         let cos_theta = (a * a + b * b - c * c) / (2.0 * a * b);
         let cos_theta = cos_theta.clamp(-1.0, 1.0);
         let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
-        dbg!(sin_theta);
 
         // Check if triangle is non-obtuse at C (required for the method)
         // If θ > 90°, cannot do two-sided update from within triangle
@@ -460,5 +474,51 @@ mod tests {
                 avg_dist
             );
         }
+    }
+
+    #[test]
+    fn test_fast_marching_multiple_sources() {
+        // Create a simple square made of two triangles
+        let vertices = vec![
+            DVector::from_vec(vec![0.0, 0.0, 0.0]),
+            DVector::from_vec(vec![1.0, 0.0, 0.0]),
+            DVector::from_vec(vec![1.0, 1.0, 0.0]),
+            DVector::from_vec(vec![0.0, 1.0, 0.0]),
+        ];
+
+        let faces = vec![(0, 1, 2), (0, 2, 3)];
+
+        let manifold = Manifold::new(vertices, faces);
+        let fm = FastMarching::new(&manifold);
+
+        // Test with multiple sources using Vec
+        let distances = fm.compute_distance(vec![0, 2]).unwrap();
+
+        println!("Multiple source distances: {:?}", distances);
+
+        // Both sources should have zero distance
+        assert!(distances[0].abs() < 1e-6, "Source 0 distance should be 0");
+        assert!(distances[2].abs() < 1e-6, "Source 2 distance should be 0");
+
+        // Vertices 1 and 3 should be at distance 1 from their nearest source
+        assert!(
+            (distances[1] - 1.0).abs() < 1e-6,
+            "Distance to vertex 1: expected 1.0, got {}",
+            distances[1]
+        );
+        assert!(
+            (distances[3] - 1.0).abs() < 1e-6,
+            "Distance to vertex 3: expected 1.0, got {}",
+            distances[3]
+        );
+
+        // Test with array syntax
+        let distances2 = fm.compute_distance([0, 2]).unwrap();
+        assert_eq!(distances, distances2);
+
+        // Test with slice
+        let sources = vec![0, 2];
+        let distances3 = fm.compute_distance(sources.as_slice()).unwrap();
+        assert_eq!(distances, distances3);
     }
 }
