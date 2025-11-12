@@ -2,7 +2,7 @@ use std::io::Write;
 
 use geopathic::colormaps::{distance_colormap, iso_distances};
 use geopathic::edp::HeatMethod;
-use geopathic::fastmarching::{self, FastMarching};
+use geopathic::fastmarching::FastMarching;
 use geopathic::ich::ICH;
 use geopathic::loader::load_manifold;
 use geopathic::mesh::Mesh;
