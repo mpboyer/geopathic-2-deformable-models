@@ -15,6 +15,7 @@ use std::rc::Rc;
 use image::{DynamicImage, GenericImage};
 
 use crate::manifold::{Manifold, Path, Point};
+use crate::sources::Sources;
 
 pub struct Viewer {
     pub window: Window,
@@ -142,6 +143,12 @@ impl Viewer {
         self.nodes.push(source);
         self.nodes.push(target);
 
+        // set the color (argument of default)
+        let (r, g, b) = match color {
+            Some(c) => (c[0], c[1], c[2]),
+            None => (0.0, 0.0, 1.0),
+        };
+
         for i in 0..path.len() - 1 {
             // extract start and end points of the segment
             let p0 = &path[i];
@@ -154,12 +161,6 @@ impl Viewer {
                 (p1[2] - p0[2]) as f32,
             );
             let mut line = self.window.add_cylinder(0.005 * scale, dir.norm());
-
-            // set the color (argument of default)
-            let (r, g, b) = match color {
-                Some(c) => (c[0], c[1], c[2]),
-                None => (0.0, 0.0, 1.0),
-            };
             line.set_color(r, g, b);
 
             // set the position and orientation
@@ -195,6 +196,28 @@ impl Viewer {
         self.nodes.push(source);
     }
 
+    pub fn plot_sources<S: Into<Sources>>(
+        &mut self,
+        manifold: &Manifold,
+        sources: S,
+        scale: Option<f32>,
+        color: Option<Point3<f32>>,
+    ) {
+        let source_scale = match scale {
+            None => Some(10.0),
+            _ => scale,
+        };
+
+        let true_sources: Sources = sources.into();
+        let source_color = match color {
+            None => Some(Point3::from_slice(&[0.0, 0.0, 1.0])),
+            _ => color,
+        };
+
+        for &s in true_sources.iter() {
+            self.draw_point(manifold.vertices()[s].clone(), source_scale, source_color);
+        }
+    }
     /// Launches the render loop.
     pub fn render(&mut self, rotate: bool) {
         // rotate the object a bit each frame

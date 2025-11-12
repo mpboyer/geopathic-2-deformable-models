@@ -20,6 +20,13 @@ fn compute_cotangent(a: &Point, b: &Point) -> f64 {
     }
 }
 
+fn solve_linear_system(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, String> {
+    a.clone()
+        .lu()
+        .solve(b)
+        .ok_or_else(|| "Failed to solve linear system. Matrix may be ill-conditioned.".to_string())
+}
+
 impl Manifold {
     fn compute_face_gradient(
         &self,
@@ -171,13 +178,12 @@ impl Laplacian {
     }
 }
 
-pub struct HeatMethod<'a> {
+pub struct EDPMethod<'a> {
     manifold: &'a Manifold,
     pub laplace: Laplacian,
     time_step: f64,
 }
-
-impl<'a> HeatMethod<'a> {
+impl<'a> EDPMethod<'a> {
     pub fn new(manifold: &'a Manifold, time_step: f64) -> Self {
         Self {
             manifold,
@@ -186,12 +192,15 @@ impl<'a> HeatMethod<'a> {
         }
     }
 
-    pub fn compute_distance<S: Into<Sources>>(&self, sources: S) -> Result<DVector<f64>, String> {
+    pub fn compute_distance_heat<S: Into<Sources>>(
+        &self,
+        sources: S,
+    ) -> Result<DVector<f64>, String> {
         let sources = sources.into();
-        self.compute_distance_impl(&sources.0)
+        self.compute_distance_heat_impl(&sources.0)
     }
 
-    fn compute_distance_impl(&self, sources: &[usize]) -> Result<DVector<f64>, String> {
+    fn compute_distance_heat_impl(&self, sources: &[usize]) -> Result<DVector<f64>, String> {
         let n = self.manifold.vertices().len();
 
         // Validate sources
@@ -215,7 +224,7 @@ impl<'a> HeatMethod<'a> {
             rhs[source] = 1.0;
         }
 
-        let u = Self::solve_linear_system(&heat_matrix, &rhs)?;
+        let u = solve_linear_system(&heat_matrix, &rhs)?;
 
         // X = -∇u / |∇u|
         let mut face_gradients = Vec::new();
@@ -238,9 +247,9 @@ impl<'a> HeatMethod<'a> {
         let regularization = 1e-4;
         let regularized_laplacian = &self.laplace.laplace_matrix + &identity * regularization;
 
-        let phi = Self::solve_linear_system(&regularized_laplacian, &divergence_x)?;
+        let phi = solve_linear_system(&regularized_laplacian, &divergence_x)?;
 
-        // For multiple sources, shift so that the minimum distance at sources is 0
+        // For multiple sources, sh ggift so that the minimum distance at sources is 0
         let min_phi_at_sources = sources
             .iter()
             .map(|&s| phi[s])
@@ -252,10 +261,73 @@ impl<'a> HeatMethod<'a> {
         Ok(distances)
     }
 
-    fn solve_linear_system(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, String> {
-        a.clone().lu().solve(b).ok_or_else(|| {
-            "Failed to solve linear system. Matrix may be ill-conditioned.".to_string()
-        })
+    pub fn compute_distance_spectral<S: Into<Sources>>(
+        &self,
+        sources: S,
+    ) -> Result<DVector<f64>, String> {
+        let sources = sources.into();
+        self.compute_distance_spectral_impl(&sources.0)
+    }
+
+    fn compute_distance_spectral_impl(&self, sources: &[usize]) -> Result<DVector<f64>, String> {
+        let n = self.manifold.vertices().len();
+
+        // Validate sources
+        for &source in sources {
+            if source >= n {
+                return Err(format!(
+                    "Source vertex {} out of bounds (max: {})",
+                    source,
+                    n - 1
+                ));
+            }
+        }
+
+        // (I + t*L)u = δ_source
+        let identity = DMatrix::identity(n, n);
+        let heat_matrix = &identity + &self.laplace.laplace_matrix * self.time_step;
+
+        let mut rhs = DVector::zeros(n);
+
+        for &source in sources {
+            rhs[source] = 1.0;
+        }
+
+        let u = solve_linear_system(&heat_matrix, &rhs)?;
+
+        // X = -∇u / |∇u|
+        let mut face_gradients = Vec::new();
+
+        for face_idx in 0..self.manifold.faces().len() {
+            let gradient = self.manifold.compute_face_gradient(face_idx, &u)?;
+
+            let grad_norm = gradient.norm();
+            let normalized_grad = if grad_norm > 1e-10 {
+                -gradient / grad_norm
+            } else {
+                DVector::zeros(3)
+            };
+            face_gradients.push(normalized_grad);
+        }
+
+        // Solve Poisson equation L*φ = ∇·X
+        let divergence_x = self.manifold.compute_divergence(&face_gradients)?;
+
+        let regularization = 1e-4;
+        let regularized_laplacian = &self.laplace.laplace_matrix + &identity * regularization;
+
+        let phi = solve_linear_system(&regularized_laplacian, &divergence_x)?;
+
+        // For multiple sources, shift so that the minimum distance at sources is 0
+        let min_phi_at_sources = sources
+            .iter()
+            .map(|&s| phi[s])
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(0.0);
+        let distances = phi.map(|x| x - min_phi_at_sources);
+        // println!("{}", &distances);
+
+        Ok(distances)
     }
 }
 
@@ -298,10 +370,10 @@ mod tests {
         let faces = vec![(0, 1, 2), (0, 2, 3)];
 
         let manifold = Manifold::new(vertices, faces);
-        let heat = HeatMethod::new(&manifold, 0.01);
+        let heat = EDPMethod::new(&manifold, 0.01);
 
         // Test with multiple sources
-        let distances = heat.compute_distance(vec![0, 2]).unwrap();
+        let distances = heat.compute_distance_heat(vec![0, 2]).unwrap();
 
         println!("Multiple source distances (heat method): {:?}", distances);
 
@@ -310,7 +382,7 @@ mod tests {
         assert!(distances[2].abs() < 1e-2, "Source 2 distance should be ~0");
 
         // Test with array syntax
-        let distances2 = heat.compute_distance([0, 2]).unwrap();
+        let distances2 = heat.compute_distance_heat([0, 2]).unwrap();
 
         // Distances should be similar (may not be exact due to numerical methods)
         for i in 0..4 {

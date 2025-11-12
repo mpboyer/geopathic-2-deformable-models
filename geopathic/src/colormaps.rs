@@ -3,6 +3,10 @@ use nalgebra::{DVector, Point3};
 use crate::manifold::{Manifold, Path};
 use crate::viewer::Viewer;
 
+// Color endpoints: purple #7d1dd3 to yellow #ffe500
+const COLOR_START: [f64; 3] = [0xff as f64, 0x00 as f64, 0x00 as f64];
+const COLOR_END: [f64; 3] = [0x00 as f64, 0xff as f64, 0x00 as f64];
+
 pub fn random_colormap(manifold: &Manifold) -> Vec<[u8; 4]> {
     (0..manifold.faces().len())
         .map(|i| {
@@ -66,10 +70,6 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>) -> Vec<[
         .fold(f64::NEG_INFINITY, f64::max);
     let range = max_dist - min_dist;
 
-    // Color endpoints: purple #7d1dd3 to yellow #ffe500
-    let color_start = [0xff as f64, 0x00 as f64, 0x00 as f64]; // Purple
-    let color_end = [0x00 as f64, 0xff as f64, 0x00 as f64]; // Yellow
-
     for face in manifold.faces() {
         let (i, j, k) = *face;
 
@@ -87,9 +87,9 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>) -> Vec<[
             colormap.push([200, 200, 200, 255]); // Grey for infinite distances
         } else {
             // Interpolate colors
-            let r = (color_start[0] + t * (color_end[0] - color_start[0])) as u8;
-            let g = (color_start[1] + t * (color_end[1] - color_start[1])) as u8;
-            let b = (color_start[2] + t * (color_end[2] - color_start[2])) as u8;
+            let r = (COLOR_START[0] + t * (COLOR_END[0] - COLOR_START[0])) as u8;
+            let g = (COLOR_START[1] + t * (COLOR_END[1] - COLOR_START[1])) as u8;
+            let b = (COLOR_START[2] + t * (COLOR_END[2] - COLOR_START[2])) as u8;
             colormap.push([r, g, b, 255]);
         }
     }
@@ -101,29 +101,38 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>) -> Vec<[
 pub fn iso_distances(
     manifold: &Manifold,
     distances: &DVector<f64>,
-    threshold: f64,
+    tolerance: f64,
 ) -> Vec<(f64, Path)> {
     let mut paths = Vec::new();
+
+    let min_dist = distances.min();
+    let max_dist = distances.max();
+    let iters = ((max_dist - min_dist) / (2.0 * tolerance)).ceil() as usize;
+
     let mut grouped_indices: Vec<(f64, Vec<usize>)> = Vec::new();
+    for index in 0..iters {
+        grouped_indices.push((index as f64 * 2.0 * tolerance, Vec::new()));
+    }
 
     for (index, &value) in distances.iter().enumerate() {
-        match grouped_indices
-            .iter_mut()
-            .find(|(val, _)| (*val - value).abs() < threshold)
-        {
-            Some((_, indices)) => indices.push(index),
-            None => grouped_indices.push((value, vec![index])),
-        }
+        let group_index = (value / (2.0 * tolerance)).floor() as usize;
+        grouped_indices[group_index].1.push(index);
     }
 
     for (dist, indices) in grouped_indices {
-        paths.push((
-            dist,
-            indices
-                .iter()
-                .map(|&index| manifold.vertices()[index].clone())
-                .collect(),
-        ));
+        match indices[..] {
+            [] => continue,
+            _ => {
+                paths.push((
+                    dist,
+                    indices
+                        .iter()
+                        .map(|&index| manifold.vertices()[index].clone())
+                        .collect(),
+                ));
+                dbg!(dist);
+            }
+        }
     }
 
     paths
@@ -131,9 +140,6 @@ pub fn iso_distances(
 
 impl Viewer {
     pub fn plot_curves(&mut self, paths: Vec<(f64, Path)>) {
-        let color_start = [0xff as f32, 0x00 as f32, 0x00 as f32]; // #ff0000
-        let color_end = [0x00 as f32, 0xff as f32, 0x00 as f32]; // #00ff00
-
         let min_dist = paths
             .iter()
             .cloned()
@@ -148,11 +154,13 @@ impl Viewer {
             plot.push(path[0].clone());
 
             let t = (dist - min_dist) / (max_dist - min_dist);
-            let r = color_start[0] + t as f32 * (color_end[0] - color_start[0]);
-            let g = color_start[1] + t as f32 * (color_end[1] - color_start[1]);
-            let b = color_start[2] + t as f32 * (color_end[2] - color_start[2]);
+            dbg!(plot.len(), t);
+            let r = (COLOR_START[0] + t * (COLOR_END[0] - COLOR_START[0])) as f32;
+            let g = (COLOR_START[1] + t * (COLOR_END[1] - COLOR_START[1])) as f32;
+            let b = (COLOR_START[2] + t * (COLOR_END[2] - COLOR_START[2])) as f32;
 
             let color = Some(Point3::from_slice(&[r, g, b]));
+            dbg!(color);
 
             self.draw_path(&plot, Some(1.0), color);
         }
