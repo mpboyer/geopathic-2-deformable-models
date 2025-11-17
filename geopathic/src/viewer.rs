@@ -230,6 +230,10 @@ impl Viewer {
             }
         }
     }
+
+    pub fn white_background(&mut self) {
+        self.window.set_background_color(1.0, 1.0, 1.0);
+    }
 }
 
 impl Default for Viewer {
