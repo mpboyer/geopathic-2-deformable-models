@@ -12,8 +12,8 @@ use nalgebra::{DVector, Point3};
 
 fn main() {
     // heat_method();
-    fast_marching();
-    // ich();
+    // fast_marching();
+    ich();
 }
 
 #[allow(dead_code)]
@@ -67,7 +67,7 @@ fn fast_marching() {
 
 #[allow(dead_code)]
 fn ich() {
-    let manifold = load_manifold("../examples/models/20_icosahedron.obj").unwrap();
+    let manifold = load_manifold("../examples/models/rabbit-low-poly.obj").unwrap();
     print!("Converting to mesh...");
     std::io::stdout().flush().unwrap();
     let mesh = Mesh::from_manifold(&manifold);
@@ -76,7 +76,7 @@ fn ich() {
 
     print!("Running ICH...");
     std::io::stdout().flush().unwrap();
-    let mut ich = ICH::new(mesh, vec![0], vec![], vec![]);
+    let mut ich = ICH::new(mesh, vec![50], vec![], vec![]);
     ich.run();
     println!("done.");
     ich.print_stats();
@@ -85,8 +85,8 @@ fn ich() {
     let colormap = distance_colormap(&manifold, &DVector::from_vec(distances));
 
     let mut viewer = Viewer::new();
+    viewer.white_background();
     viewer.add_manifold(&manifold, Some(colormap));
-    // viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
 
     for dest in 1..manifold.vertices().len() {
         let path: Vec<DVector<f64>> = ich
@@ -94,7 +94,7 @@ fn ich() {
             .iter()
             .map(|p| DVector::from_vec(vec![p.x, p.y, p.z]))
             .collect();
-        viewer.draw_path(&path, Some(5.0), None);
+        viewer.draw_path(&path, Some(20.0), None);
     }
 
     println!("Rendering...");
