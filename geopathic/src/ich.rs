@@ -577,7 +577,7 @@ impl ICH {
         let inter_x = v2.x - v2.y * (v2.x - source_2d.x) / (v2.y - source_2d.y);
 
         // only right child window
-        /*let (left_win, right_win) = if inter_x <= left.x {
+        let (left_win, right_win) = if inter_x <= left.x {
             // compute the window
             let t0 = self.intersect(source_2d, left, v2, v1);
             let t1 = self.intersect(source_2d, right, v2, v1);
@@ -611,9 +611,9 @@ impl ICH {
 
             // return only left window
             (Some(left_win), None)
-        }*/
+        }
         // both child windows
-        let (left_win, right_win) = {
+        else {
             let opposite_vertex = self.mesh.edges[e1].end;
             let direct_distance = (v2 - source_2d).norm();
 
@@ -953,7 +953,6 @@ impl ICH {
 
     /// Checks if a window is valid based on ICH's filters.
     fn is_valid_window(&self, window: &Window, is_left: bool) -> bool {
-        return true;
         // degenerate window
         if window.b1 <= window.b0 {
             return false;
