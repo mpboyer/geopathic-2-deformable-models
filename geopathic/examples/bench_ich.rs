@@ -24,14 +24,17 @@ fn main() {
     let skipped = [
         // non-manifold meshes
         "nonmanifold_edge.obj",
+        "suzanne.obj",
         "teapot.obj",
         // weird propagation
         "cow-nonormals.obj",
         // too big
-        "xwings.obj",
+        // "xwings.obj",
         "screw.obj",
         "dragon.obj",
         "rabbit-head.obj",
+        "fantasy-piece.obj",
+        "ferrari.obj",
     ];
     let model_paths: Vec<_> = model_paths
         .into_iter()
@@ -40,7 +43,7 @@ fn main() {
 
     let mut rng = rand::rng();
     let timestamp = chrono::Local::now().format("%m:%d_%H:%M:%S").to_string();
-    let mut file = File::create(format!("../benchmarks/ich_benchmark_{}.csv", timestamp)).unwrap();
+    let mut file = File::create(format!("../benchmarks/csv/ich_benchmark_{}.csv", timestamp)).unwrap();
     writeln!(
         file,
         "model,vertices,faces,source,time,windows_created,windows_propagated"
@@ -58,7 +61,7 @@ fn main() {
     }
 
     for path in model_paths {
-        print!("Benchmarking {:?}... ", path.file_name().unwrap());
+        print!("Benchmarking {:?}", path.file_name().unwrap());
         std::io::stdout().flush().unwrap();
         // load the manifold
         let manifold = load_manifold(path.to_str().unwrap());
@@ -104,6 +107,8 @@ fn main() {
                 stats.windows_propagated,
             )
             .unwrap();
+            print!(".");
+            std::io::stdout().flush().unwrap();
         }
         println!("done.");
     }

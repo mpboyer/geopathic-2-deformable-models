@@ -4,15 +4,16 @@ from matplotlib import rc
 import seaborn as sns
 import scipy.stats as stats
 import numpy as np
+from adjustText import adjust_text
 
 rc("font", **{"family": "serif", "serif": ["Computer Modern"]})
 rc("text", usetex=True)
 
-data = pd.read_csv('benchmarks/csv/ich_benchmark_11:18_13:07:24.csv')
+data = pd.read_csv('benchmarks/csv/ich_benchmark_11:18_20:08:45.csv')
 
 plot = sns.relplot(
-    height=4,
-    aspect=1.2,
+    height=3,
+    aspect=1,
     data=data,
     x="vertices",
     y="time",
@@ -38,16 +39,22 @@ data["source"] = data["source"].astype(str)
 data["model"] = data["model"].astype(str)
 
 # Annotate each (source, model) group at the average (vertices, time) position
+texts = []
 for model, group in data.groupby(["model"]):
     avg_vertices = group["vertices"].mean()
     avg_time = group["time"].mean()
     # Offset label to the right by 5% of the average x value
-    offset_vertices = avg_vertices * 1.15
-    plot.ax.text(
-        offset_vertices, avg_time, str(model[0][:-4]),
-        fontsize=8, ha='left', va='center'
-    )
+    # plot.ax.text(avg_vertices * 1.3, avg_time, str(model[0][:-4]), fontsize=7, ha='left', va='center') # right
+    # plot.ax.text(avg_vertices * 1.1, avg_time / 1.5, str(model[0][:-4]), fontsize=7, ha='left', va='center', rotation=-30) # rotated
+    # texts.append(plot.ax.text(avg_vertices, avg_time, str(model[0][:-4]), fontsize=10, ha='center', va='center')) # adjust_text
 
+    # if higher than the fit line, put label above and to the right
+    if avg_time > 10**(slope * np.log10(avg_vertices) + intercept):
+        plot.ax.text(avg_vertices / 1.1, avg_time, str(model[0][:-4]), fontsize=7, ha='right', va='center')
+    else:
+        plot.ax.text(avg_vertices * 1.1, avg_time, str(model[0][:-4]), fontsize=7, ha='left', va='center')
+
+# adjust_text(texts, ax=plot.ax, arrowprops=dict(arrowstyle='->', color='gray', lw=0.5))
 plot.figure.tight_layout()
 plot.legend.remove()
 plot.savefig("benchmarks/pdf/ich_benchmark.pdf", bbox_inches="tight")
