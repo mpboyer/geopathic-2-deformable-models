@@ -4,9 +4,16 @@ use crate::manifold::Triangle;
 
 use obj::Obj;
 
+#[derive(Debug)]
+/// Errors that can occur while loading a manifold.
+pub enum LoadError {
+    ObjError(obj::ObjError),
+    NonTriangularFace(usize),
+}
+
 /// Loads a manifold from an OBJ file.
-pub fn load_manifold(file_path: &str) -> Result<Manifold, obj::ObjError> {
-    let object = Obj::load(file_path)?;
+pub fn load_manifold(file_path: &str) -> Result<Manifold, LoadError> {
+    let object = Obj::load(file_path).map_err(LoadError::ObjError)?;
 
     let mut vertices: Vec<Point> = Vec::new();
     let mut faces: Vec<Triangle> = Vec::new();
@@ -22,10 +29,7 @@ pub fn load_manifold(file_path: &str) -> Result<Manifold, obj::ObjError> {
                 let indices: Vec<usize> = poly.0.iter().map(|v| v.0).collect();
                 match indices.len() {
                     3 => faces.push((indices[0], indices[1], indices[2])),
-                    _ => panic!(
-                        "Warning: Non-triangular face detected with {} vertices. Only triangular faces are supported.",
-                        indices.len()
-                    ),
+                    _ => return Err(LoadError::NonTriangularFace(indices.len())),
                 }
             }
         }

@@ -178,7 +178,7 @@ pub struct ICH {
     /// The pseudo source queue for processing.
     pseudo_source_queue: BinaryHeap<PseudoWindow>,
     /// Statistics collected during the algorithm.
-    stats: ICHStats,
+    pub stats: ICHStats,
     /// Information about each vertex.
     vertex_infos: Vec<VertexInfo>,
     /// Information for split checks.
