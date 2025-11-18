@@ -25,6 +25,8 @@ fn main() {
         // non-manifold meshes
         "nonmanifold_edge.obj",
         "teapot.obj",
+        // weird propagation
+        "cow-nonormals.obj",
         // too big
         "xwings.obj",
         "screw.obj",
