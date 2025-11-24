@@ -4,7 +4,7 @@ from matplotlib import rc
 import seaborn as sns
 import scipy.stats as stats
 import numpy as np
-from adjustText import adjust_text
+# from adjustText import adjust_text
 
 rc("font", **{"family": "serif", "serif": ["Computer Modern"]})
 rc("text", usetex=True)
@@ -58,3 +58,7 @@ for model, group in data.groupby(["model"]):
 plot.figure.tight_layout()
 plot.legend.remove()
 plot.savefig("benchmarks/pdf/ich_benchmark.pdf", bbox_inches="tight")
+
+print("Number of models tested:", data["model"].nunique())
+print("Minimum number of vertices:", data["vertices"].min())
+print("Maximum number of vertices:", data["vertices"].max())
