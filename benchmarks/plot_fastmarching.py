@@ -9,7 +9,7 @@ import numpy as np
 rc("font", **{"family": "serif", "serif": ["Computer Modern"]})
 rc("text", usetex=True)
 
-data = pd.read_csv("benchmarks/csv/ich_benchmark_11:18_20:08:45.csv")
+data = pd.read_csv("benchmarks/csv/fastmarching_benchmark_11:25_17:23:21.csv")
 
 plot = sns.relplot(
     height=3,
@@ -71,9 +71,8 @@ for model, group in data.groupby(["model"]):
 # adjust_text(texts, ax=plot.ax, arrowprops=dict(arrowstyle='->', color='gray', lw=0.5))
 plot.figure.tight_layout()
 plot.legend.remove()
-plot.savefig("benchmarks/pdf/ich_benchmark.pdf", bbox_inches="tight")
+plot.savefig("benchmarks/pdf/fastmarching_benchmark.pdf", bbox_inches="tight")
 
 print("Number of models tested:", data["model"].nunique())
 print("Minimum number of vertices:", data["vertices"].min())
 print("Maximum number of vertices:", data["vertices"].max())
-
