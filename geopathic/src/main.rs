@@ -26,7 +26,7 @@ fn heat_method() {
         Ok(it) => it,
         Err(err) => panic!("{}", err),
     };
-    let colormap = distance_colormap(&manifold, &distances);
+    let colormap = distance_colormap(&manifold, &distances, false);
 
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, Some(colormap));
@@ -65,7 +65,7 @@ fn fast_marching() {
 
 #[allow(dead_code)]
 fn ich() {
-    let manifold = load_manifold("../examples/models/rabbit-low-poly.obj").unwrap();
+    let manifold = load_manifold("../examples/models/star.obj").unwrap();
     print!("Converting to mesh...");
     std::io::stdout().flush().unwrap();
     let mesh = Mesh::from_manifold(&manifold);
@@ -74,19 +74,23 @@ fn ich() {
 
     print!("Running ICH...");
     std::io::stdout().flush().unwrap();
-    let mut ich = ICH::new(mesh, vec![50], vec![], vec![]);
+    let mut ich = ICH::new(mesh, vec![0], vec![], vec![]);
     ich.run();
     println!("done.");
     ich.print_stats();
 
     let distances = ich.distances_to_vertices();
-    let colormap = distance_colormap(&manifold, &DVector::from_vec(distances));
+    let colormap = distance_colormap(&manifold, &DVector::from_vec(distances.clone()), true);
 
     let mut viewer = Viewer::new();
     viewer.white_background();
     viewer.add_manifold(&manifold, Some(colormap));
 
+    #[allow(clippy::needless_range_loop)]
     for dest in 1..manifold.vertices().len() {
+        if distances[dest].is_infinite() {
+            continue;
+        }
         let path: Vec<DVector<f64>> = ich
             .path_to_vertex(dest)
             .iter()

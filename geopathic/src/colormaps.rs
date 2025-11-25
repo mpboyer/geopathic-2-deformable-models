@@ -46,10 +46,11 @@ pub fn vertical_colormap(manifold: &Manifold) -> Vec<[u8; 4]> {
     colormap
 }
 
-/// Create a colormap from distance values, mapping from purple (#7d1dd3) to yellow (#ffe500).
+/// Create a colormap from distance values, mapping from red to green.
 /// The distance value for each face is the mean of its vertex distances.
-/// Infinite distances are colored grey.
-pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>) -> Vec<[u8; 4]> {
+/// Infinite distances are colored grey if interpolate_infinite is false,
+/// otherwise they are interpolated based on the finite distances of adjacent faces.
+pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>, interpolate_infinite: bool) -> Vec<[u8; 4]> {
     let mut colormap = Vec::with_capacity(manifold.faces().len());
 
     // Only keep finite distances for min/max calculation
@@ -84,7 +85,35 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>) -> Vec<[
         };
 
         if mean_dist.is_infinite() {
-            colormap.push([200, 200, 200, 255]); // Grey for infinite distances
+            if !interpolate_infinite {
+                colormap.push([200, 200, 200, 255]); // Grey for infinite distances
+            } else {
+                // interpolate colors between only two points
+                let mean_dist_1 = (distances[i] + distances[j]) / 2.0;
+                let mean_dist_2 = (distances[j] + distances[k]) / 2.0;
+                let mean_dist_3 = (distances[k] + distances[i]) / 2.0;
+                if mean_dist_1.is_infinite() && mean_dist_2.is_infinite() && mean_dist_3.is_infinite() {
+                    colormap.push([200, 200, 200, 255]); // Grey for infinite distances
+                } else {
+                    let mut finite_means = Vec::new();
+                    if mean_dist_1.is_finite() {
+                        finite_means.push(mean_dist_1);
+                    }
+                    if mean_dist_2.is_finite() {
+                        finite_means.push(mean_dist_2);
+                    }
+                    if mean_dist_3.is_finite() {
+                        finite_means.push(mean_dist_3);
+                    }
+                    let avg_mean = finite_means.iter().sum::<f64>() / (finite_means.len() as f64);
+                    let t_avg = (avg_mean - min_dist) / range;
+                    let r = (COLOR_START[0] + t_avg * (COLOR_END[0] - COLOR_START[0])) as u8;
+                    let g = (COLOR_START[1] + t_avg * (COLOR_END[1] - COLOR_START[1])) as u8;
+                    let b = (COLOR_START[2] + t_avg * (COLOR_END[2] - COLOR_START[2])) as u8;
+                    colormap.push([r, g, b, 255]);
+                }
+            }
+
         } else {
             // Interpolate colors
             let r = (COLOR_START[0] + t * (COLOR_END[0] - COLOR_START[0])) as u8;
