@@ -12,14 +12,14 @@ use nalgebra::{DVector, Point3};
 
 fn main() {
     // heat_method();
-    // fast_marching();
-    ich();
+    fast_marching();
+    // ich();
 }
 
 #[allow(dead_code)]
 fn heat_method() {
     let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
-    let heat_method = EDPMethod::new(&manifold, 0.5);
+    let heat_method = EDPMethod::new(&manifold);
 
     let sources = [0, 431];
     let distances = match heat_method.compute_distance_heat(sources) {
@@ -46,22 +46,20 @@ fn heat_method() {
 
 #[allow(dead_code)]
 fn fast_marching() {
-    let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+    let manifold = load_manifold("../examples/models/screw.obj").unwrap();
     let fastmarching = FastMarching::new(&manifold);
     let sources = [0, 256];
     let distances = match fastmarching.compute_distance(sources) {
         Ok(it) => it,
         Err(err) => panic!("{}", err),
     };
-    let colormap = distance_colormap(&manifold, &distances);
+    let colormap = None; // Some(distance_colormap(&manifold, &distances));
 
     let mut viewer = Viewer::new();
-    viewer.add_manifold(&manifold, Some(colormap));
+    viewer.add_manifold(&manifold, colormap);
     viewer.plot_curves(iso_distances(&manifold, &distances, 1.0));
 
     viewer.plot_sources(&manifold, sources, None, None);
-
-    viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
     viewer.render(true);
 }
 

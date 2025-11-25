@@ -97,6 +97,25 @@ impl Manifold {
 
         Ok(divergence)
     }
+
+    fn compute_time_step(&self) -> f64 {
+        let mut value = 0.0;
+        let n_edges = 1.5 * self.faces.len() as f64;
+        for f in &self.faces {
+            let (i, j, k) = f;
+            let v0 = &self.vertices[*i];
+            let v1 = &self.vertices[*j];
+            let v2 = &self.vertices[*k];
+
+            let e0 = v2 - v1;
+            let e1 = v0 - v2;
+            let e2 = v1 - v0;
+
+            value += 0.5 * (e0.norm() + e1.norm() + e2.norm());
+        }
+        let h = value / n_edges;
+        h * h
+    }
 }
 
 /// Structure used for computing the laplacian of a manifold, as its matrix
@@ -184,11 +203,11 @@ pub struct EDPMethod<'a> {
     time_step: f64,
 }
 impl<'a> EDPMethod<'a> {
-    pub fn new(manifold: &'a Manifold, time_step: f64) -> Self {
+    pub fn new(manifold: &'a Manifold) -> Self {
         Self {
             manifold,
             laplace: Laplacian::new(manifold),
-            time_step,
+            time_step: manifold.compute_time_step(),
         }
     }
 
@@ -370,7 +389,7 @@ mod tests {
         let faces = vec![(0, 1, 2), (0, 2, 3)];
 
         let manifold = Manifold::new(vertices, faces);
-        let heat = EDPMethod::new(&manifold, 0.01);
+        let heat = EDPMethod::new(&manifold);
 
         // Test with multiple sources
         let distances = heat.compute_distance_heat(vec![0, 2]).unwrap();
