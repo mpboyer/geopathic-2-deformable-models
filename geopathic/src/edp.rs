@@ -1,5 +1,7 @@
 /// Module computing geodesics based on different PDEs
 use core::f64;
+use itertools::Itertools;
+use kiss3d::ncollide3d::simba::scalar::SupersetOf;
 use nalgebra::{DMatrix, DVector};
 use std::collections::HashMap;
 
@@ -197,6 +199,21 @@ impl Laplacian {
     }
 }
 
+/// Structure to help choose from the different poisson equations
+// J'ai pas pu m'empêcher pour le nom désolé.
+pub enum Poiffon {
+    ScreenedPoiffon, // (\Delta - \frac{1}{\rho^{2}}) = 0 on M, u = 1 on \partial M
+    BorderPoiffon,   // \Delta u = -1 on M, u = 0 on \partial M
+}
+
+/// Structure to help choose from the different spectral distance
+pub enum SpectralPDE {
+    Eigenmap,
+    CommuteTime,
+    Biharmonic,
+    Diffusion,
+}
+
 pub struct EDPMethod<'a> {
     manifold: &'a Manifold,
     pub laplace: Laplacian,
@@ -280,15 +297,79 @@ impl<'a> EDPMethod<'a> {
         Ok(distances)
     }
 
+    pub fn compute_distance_poisson<S: Into<Sources>>(
+        &self,
+        sources: S,
+        equation: Poiffon,
+    ) -> Result<DVector<f64>, String> {
+        let sources = sources.into();
+        self.compute_distance_poisson_impl(&sources.0, equation)
+    }
+
+    fn compute_distance_poisson_impl(
+        &self,
+        sources: &[usize],
+        equation: Poiffon,
+    ) -> Result<DVector<f64>, String> {
+        let n = self.manifold.vertices().len();
+
+        // Validate sources
+        for &source in sources {
+            if source >= n {
+                return Err(format!(
+                    "Source vertex {} out of bounds (max: {})",
+                    source,
+                    n - 1
+                ));
+            }
+        }
+        let identity = DMatrix::identity(n, n);
+
+        // Equation depending on the source. No time step here, only spatial derivatives
+        let poisson_matrix = match equation {
+            Poiffon::ScreenedPoiffon => &self.laplace.laplace_matrix - &identity,
+            // For typing purposes we substract 0
+            Poiffon::BorderPoiffon => &self.laplace.laplace_matrix - 0.0 * &identity,
+        };
+
+        let mut rhs = DVector::zeros(n);
+
+        for &source in sources {
+            rhs[source] = 1.0;
+        }
+
+        let u = solve_linear_system(&poisson_matrix, &rhs)?;
+
+        // For multiple sources, sh ggift so that the minimum distance at sources is 0
+        let min_phi_at_sources = sources
+            .iter()
+            .map(|&s| u[s])
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(0.0);
+        let distances = u.map(|x| x - min_phi_at_sources);
+        // println!("{}", &distances);
+
+        Ok(distances)
+    }
+
+    /// Compute the spectral distance passed as argument. Note that the equation is valid for all
+    /// $x, y$ so we compute the distances to each of the sources and take the minimum.
     pub fn compute_distance_spectral<S: Into<Sources>>(
         &self,
         sources: S,
+        equation: SpectralPDE,
+        embedding_size: usize,
     ) -> Result<DVector<f64>, String> {
         let sources = sources.into();
-        self.compute_distance_spectral_impl(&sources.0)
+        self.compute_distance_spectral_impl(&sources.0, equation, embedding_size)
     }
 
-    fn compute_distance_spectral_impl(&self, sources: &[usize]) -> Result<DVector<f64>, String> {
+    fn compute_distance_spectral_impl(
+        &self,
+        sources: &[usize],
+        equation: SpectralPDE,
+        embedding_size: usize,
+    ) -> Result<DVector<f64>, String> {
         let n = self.manifold.vertices().len();
 
         // Validate sources
@@ -302,51 +383,69 @@ impl<'a> EDPMethod<'a> {
             }
         }
 
-        // (I + t*L)u = δ_source
-        let identity = DMatrix::identity(n, n);
-        let heat_matrix = &identity + &self.laplace.laplace_matrix * self.time_step;
+        let squared_eigens = (&self.laplace.laplace_matrix
+            * &self.laplace.laplace_matrix.transpose())
+            .symmetric_eigen();
 
-        let mut rhs = DVector::zeros(n);
-
-        for &source in sources {
-            rhs[source] = 1.0;
-        }
-
-        let u = solve_linear_system(&heat_matrix, &rhs)?;
-
-        // X = -∇u / |∇u|
-        let mut face_gradients = Vec::new();
-
-        for face_idx in 0..self.manifold.faces().len() {
-            let gradient = self.manifold.compute_face_gradient(face_idx, &u)?;
-
-            let grad_norm = gradient.norm();
-            let normalized_grad = if grad_norm > 1e-10 {
-                -gradient / grad_norm
-            } else {
-                DVector::zeros(3)
-            };
-            face_gradients.push(normalized_grad);
-        }
-
-        // Solve Poisson equation L*φ = ∇·X
-        let divergence_x = self.manifold.compute_divergence(&face_gradients)?;
-
-        let regularization = 1e-4;
-        let regularized_laplacian = &self.laplace.laplace_matrix + &identity * regularization;
-
-        let phi = solve_linear_system(&regularized_laplacian, &divergence_x)?;
-
-        // For multiple sources, shift so that the minimum distance at sources is 0
-        let min_phi_at_sources = sources
+        let eigenvalues = squared_eigens.eigenvalues;
+        let embedding_eigenvalues_iter = eigenvalues
             .iter()
-            .map(|&s| phi[s])
-            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap_or(0.0);
-        let distances = phi.map(|x| x - min_phi_at_sources);
-        // println!("{}", &distances);
+            .enumerate()
+            .sorted_by(|(_, u), (_, v)| u.partial_cmp(v).unwrap_or(std::cmp::Ordering::Less))
+            .take(embedding_size);
 
-        Ok(distances)
+        let embedding_eigenvalues = Vec::from_iter(embedding_eigenvalues_iter);
+
+        let mut eigen_embedding = DMatrix::zeros(n, embedding_size);
+
+        self.manifold
+            .vertices
+            .iter()
+            .enumerate()
+            .for_each(|(i, x)| {
+                embedding_eigenvalues
+                    .iter()
+                    .for_each(|&(j, _)| eigen_embedding[(i, j)] = x[j])
+            });
+
+        fn eigenvalue_transformation(equation: &SpectralPDE, l: &f64, time_step: &f64) -> f64 {
+            match equation {
+                SpectralPDE::Eigenmap => 1.0,
+                SpectralPDE::CommuteTime => 1.0 / l,
+                SpectralPDE::Biharmonic => {
+                    let invl = 1.0 / l;
+                    invl * invl
+                }
+                SpectralPDE::Diffusion => {
+                    let exponent = -2.0 * l * time_step;
+                    exponent.exp()
+                }
+            }
+        }
+
+        let mut distance_map = DMatrix::zeros(n, embedding_size);
+        self.manifold
+            .vertices
+            .iter()
+            .enumerate()
+            .for_each(|(x_idx, _)| {
+                sources.iter().enumerate().for_each(|(idx, &y_idx)| {
+                    let mut dist = 0.0;
+                    for i in 0..embedding_size {
+                        let point_dist = eigen_embedding[(x_idx, i)] - eigen_embedding[(y_idx, i)];
+                        let lambda_i_transform = eigenvalue_transformation(
+                            &equation,
+                            embedding_eigenvalues[i].1,
+                            &self.time_step,
+                        );
+                        dist += lambda_i_transform * point_dist.powi(2);
+                    }
+
+                    distance_map[(x_idx, idx)] = dist;
+                });
+            });
+
+        Err("pouet".to_string())
     }
 }
 
