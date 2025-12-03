@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use geopathic::colormaps::{distance_colormap, iso_distances};
-use geopathic::edp::EDPMethod;
+use geopathic::edp::{EDPMethod, Poiffon, SpectralPDE};
 use geopathic::fastmarching::FastMarching;
 use geopathic::ich::ICH;
 use geopathic::loader::load_manifold;
@@ -12,7 +12,9 @@ use nalgebra::{DVector, Point3};
 
 fn main() {
     // heat_method();
-    fast_marching();
+    // fast_marching();
+    // spectral_method();
+    poiffon_method();
     // ich();
 }
 
@@ -60,6 +62,86 @@ fn fast_marching() {
     viewer.plot_curves(iso_distances(&manifold, &distances, 1.0));
 
     viewer.plot_sources(&manifold, sources, None, None);
+    viewer.render(true);
+}
+
+#[allow(dead_code)]
+fn spectral_method() {
+    let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+    let edpmethod = EDPMethod::new(&manifold);
+
+    let sources = [0, 431];
+    let spectral_methods = [
+        SpectralPDE::Eigenmap,    // lambda
+        SpectralPDE::CommuteTime, // 1/lambda
+        SpectralPDE::Biharmonic,  // 1/lambda**2
+        SpectralPDE::Diffusion,   // exp(-2lambda)
+    ];
+
+    let spectral_distances = Vec::from_iter(spectral_methods.iter().map(|spectral_method| {
+        let distances = match edpmethod.compute_distance_spectral(sources, *spectral_method, 7) {
+            Ok(it) => it,
+            Err(err) => panic!("{}", err),
+        };
+        let colormap = distance_colormap(&manifold, &distances, false);
+
+        (distances, colormap)
+    }));
+
+    let mut viewer = Viewer::new();
+    for s in sources {
+        viewer.draw_point(
+            manifold.vertices()[s].clone(),
+            Some(10.0),
+            Some(Point3::from_slice(&[0.0, 0.0, 1.0])),
+        );
+    }
+
+    let (distances, colormap) = spectral_distances[0].clone();
+    viewer.add_manifold(&manifold, Some(colormap));
+    viewer.plot_curves(iso_distances(&manifold, &distances, 1e-6));
+
+    viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
+    viewer.render(true);
+}
+
+#[allow(dead_code)]
+fn poiffon_method() {
+    let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+    let edpmethod = EDPMethod::new(&manifold);
+
+    let sources = [0, 431];
+    let poiffon_methods = [
+        // Poiffon::ScreenedPoiffon(1.0, true),
+        // Poiffon::ScreenedPoiffon(3.0, false),
+        Poiffon::ScreenedPoiffon(34530.4, true), // rho value for universal gravitation potential
+                                                 // Poiffon::BorderPoiffon(true),
+    ];
+
+    let poiffon_distances = Vec::from_iter(poiffon_methods.iter().map(|poiffon_method| {
+        let distances = match edpmethod.compute_distance_poisson(sources, *poiffon_method) {
+            Ok(it) => it,
+            Err(err) => panic!("{}", err),
+        };
+        let colormap = distance_colormap(&manifold, &distances, false);
+
+        (distances, colormap)
+    }));
+
+    let mut viewer = Viewer::new();
+    for s in sources {
+        viewer.draw_point(
+            manifold.vertices()[s].clone(),
+            Some(10.0),
+            Some(Point3::from_slice(&[0.0, 0.0, 1.0])),
+        );
+    }
+
+    let (distances, colormap) = poiffon_distances[0].clone();
+    viewer.add_manifold(&manifold, Some(colormap));
+    viewer.plot_curves(iso_distances(&manifold, &distances, 1e-6));
+
+    viewer.camera = ArcBall::new(Point3::new(0.0, 10.0, 65.0), Point3::new(0.0, 0.0, 0.0));
     viewer.render(true);
 }
 

@@ -50,7 +50,11 @@ pub fn vertical_colormap(manifold: &Manifold) -> Vec<[u8; 4]> {
 /// The distance value for each face is the mean of its vertex distances.
 /// Infinite distances are colored grey if interpolate_infinite is false,
 /// otherwise they are interpolated based on the finite distances of adjacent faces.
-pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>, interpolate_infinite: bool) -> Vec<[u8; 4]> {
+pub fn distance_colormap(
+    manifold: &Manifold,
+    distances: &DVector<f64>,
+    interpolate_infinite: bool,
+) -> Vec<[u8; 4]> {
     let mut colormap = Vec::with_capacity(manifold.faces().len());
 
     // Only keep finite distances for min/max calculation
@@ -92,7 +96,10 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>, interpol
                 let mean_dist_1 = (distances[i] + distances[j]) / 2.0;
                 let mean_dist_2 = (distances[j] + distances[k]) / 2.0;
                 let mean_dist_3 = (distances[k] + distances[i]) / 2.0;
-                if mean_dist_1.is_infinite() && mean_dist_2.is_infinite() && mean_dist_3.is_infinite() {
+                if mean_dist_1.is_infinite()
+                    && mean_dist_2.is_infinite()
+                    && mean_dist_3.is_infinite()
+                {
                     colormap.push([200, 200, 200, 255]); // Grey for infinite distances
                 } else {
                     let mut finite_means = Vec::new();
@@ -113,7 +120,6 @@ pub fn distance_colormap(manifold: &Manifold, distances: &DVector<f64>, interpol
                     colormap.push([r, g, b, 255]);
                 }
             }
-
         } else {
             // Interpolate colors
             let r = (COLOR_START[0] + t * (COLOR_END[0] - COLOR_START[0])) as u8;
@@ -144,7 +150,7 @@ pub fn iso_distances(
     }
 
     for (index, &value) in distances.iter().enumerate() {
-        let group_index = (value / (2.0 * tolerance)).floor() as usize;
+        let group_index = ((value - min_dist) / (2.0 * tolerance)).floor() as usize;
         grouped_indices[group_index].1.push(index);
     }
 
@@ -159,7 +165,6 @@ pub fn iso_distances(
                         .map(|&index| manifold.vertices()[index].clone())
                         .collect(),
                 ));
-                dbg!(dist);
             }
         }
     }

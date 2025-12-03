@@ -1,7 +1,6 @@
 /// Module computing geodesics based on different PDEs
 use core::f64;
 use itertools::Itertools;
-use kiss3d::ncollide3d::simba::scalar::SupersetOf;
 use nalgebra::{DMatrix, DVector};
 use std::collections::HashMap;
 
@@ -199,14 +198,17 @@ impl Laplacian {
     }
 }
 
-/// Structure to help choose from the different poisson equations
-// J'ai pas pu m'empêcher pour le nom désolé.
+/// Structure to help choose from the different poisson equations.
+// J'ai pas pu m'empêcher pour le nom désolé Antoine
+#[derive(Debug, Clone, Copy)]
 pub enum Poiffon {
-    ScreenedPoiffon, // (\Delta - \frac{1}{\rho^{2}}) = 0 on M, u = 1 on \partial M
-    BorderPoiffon,   // \Delta u = -1 on M, u = 0 on \partial M
+    // bool argument is whether to apply Spalding-Tucker transform.
+    ScreenedPoiffon(f64, bool), // (\Delta - \frac{1}{arg1^{2}}) = 0 on M, u = 1 on \partial M
+    BorderPoiffon(bool),        // \Delta u = -1 on M, u = 0 on \partial M
 }
 
 /// Structure to help choose from the different spectral distance
+#[derive(Debug, Clone, Copy)]
 pub enum SpectralPDE {
     Eigenmap,
     CommuteTime,
@@ -326,18 +328,27 @@ impl<'a> EDPMethod<'a> {
         let identity = DMatrix::identity(n, n);
 
         // Equation depending on the source. No time step here, only spatial derivatives
+        let regularization = 1e-8;
         let poisson_matrix = match equation {
-            Poiffon::ScreenedPoiffon => &self.laplace.laplace_matrix - &identity,
-            // For typing purposes we substract 0
-            Poiffon::BorderPoiffon => &self.laplace.laplace_matrix - 0.0 * &identity,
+            Poiffon::ScreenedPoiffon(rho, _) => {
+                &self.laplace.laplace_matrix - rho.powi(-2) * &identity
+            }
+            Poiffon::BorderPoiffon(_) => &self.laplace.laplace_matrix + &identity * regularization,
         };
 
-        let mut rhs = DVector::zeros(n);
+        let mut rhs = match equation {
+            Poiffon::ScreenedPoiffon(_, _) => DVector::zeros(n),
+            Poiffon::BorderPoiffon(_) => DVector::from_element(n, -1.0),
+        };
 
         for &source in sources {
-            rhs[source] = 1.0;
+            // PERF: Je ne sais pas si je ne devrais pas inverser les deux
+            // (mais c'est cheum)
+            rhs[source] = match equation {
+                Poiffon::ScreenedPoiffon(_, _) => 1.0,
+                Poiffon::BorderPoiffon(_) => 0.0,
+            };
         }
-
         let u = solve_linear_system(&poisson_matrix, &rhs)?;
 
         // For multiple sources, sh ggift so that the minimum distance at sources is 0
@@ -346,12 +357,64 @@ impl<'a> EDPMethod<'a> {
             .map(|&s| u[s])
             .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
-        let distances = u.map(|x| x - min_phi_at_sources);
-        // println!("{}", &distances);
+
+        let u0 = u.map(|x| (x - min_phi_at_sources).max(0.0));
+
+        let distances = if matches!(
+            equation,
+            Poiffon::ScreenedPoiffon(_, true) | Poiffon::BorderPoiffon(true)
+        ) {
+            self.apply_spalding_tucker(&u0)?
+        } else {
+            // Standard normalization for other methods
+            u0
+        };
 
         Ok(distances)
     }
 
+    fn apply_spalding_tucker(&self, u: &DVector<f64>) -> Result<DVector<f64>, String> {
+        let n = self.manifold.vertices().len();
+        let mut transformed: DVector<f64> = DVector::zeros(n);
+
+        let mut vertex_grad_norms: DVector<f64> = DVector::zeros(n);
+        let mut vertex_counts: DVector<f64> = DVector::zeros(n);
+
+        for face_idx in 0..self.manifold.faces().len() {
+            let (i, j, k) = self.manifold.faces()[face_idx];
+
+            let gradient = self.manifold.compute_face_gradient(face_idx, u)?;
+            let grad_norm = gradient.norm();
+
+            // Accumulate gradient norm to each vertex of the face
+            // (transform face gradient to vertex gradient)
+            vertex_grad_norms[i] += grad_norm;
+            vertex_grad_norms[j] += grad_norm;
+            vertex_grad_norms[k] += grad_norm;
+
+            vertex_counts[i] += 1.0;
+            vertex_counts[j] += 1.0;
+            vertex_counts[k] += 1.0;
+        }
+        for i in 0..n {
+            if vertex_counts[i] > 0.0 {
+                vertex_grad_norms[i] /= vertex_counts[i];
+            }
+        }
+
+        // Apply Spalding-Tucker transform: sqrt(|nabla u|² + 2u - |nabla u|)
+        for i in 0..n {
+            let grad_norm = vertex_grad_norms[i];
+            let u_val = u[i];
+
+            let argument: f64 = grad_norm * grad_norm + 2.0 * u_val - grad_norm;
+
+            // Ensure numerical stability - argument should be non-negative
+            transformed[i] = if argument > 0.0 { argument.sqrt() } else { 0.0 };
+        }
+
+        Ok(transformed)
+    }
     /// Compute the spectral distance passed as argument. Note that the equation is valid for all
     /// $x, y$ so we compute the distances to each of the sources and take the minimum.
     pub fn compute_distance_spectral<S: Into<Sources>>(
@@ -387,26 +450,33 @@ impl<'a> EDPMethod<'a> {
             * &self.laplace.laplace_matrix.transpose())
             .symmetric_eigen();
 
+        let eigenvectors = squared_eigens.eigenvectors;
         let eigenvalues = squared_eigens.eigenvalues;
-        let embedding_eigenvalues_iter = eigenvalues
-            .iter()
-            .enumerate()
-            .sorted_by(|(_, u), (_, v)| u.partial_cmp(v).unwrap_or(std::cmp::Ordering::Less))
-            .take(embedding_size);
 
-        let embedding_eigenvalues = Vec::from_iter(embedding_eigenvalues_iter);
+        let embedding_eigenvalues = Vec::from_iter(
+            eigenvalues
+                .iter()
+                .enumerate()
+                .sorted_by(|(_, u), (_, v)| u.partial_cmp(v).unwrap_or(std::cmp::Ordering::Less))
+                .skip(1)
+                .take(embedding_size),
+        );
 
+        let embedding_eigenvectors = Vec::from_iter(
+            embedding_eigenvalues
+                .iter()
+                .map(|(i, _)| eigenvectors.column(*i)),
+        );
+
+        // FIXME: je sais pas faire plus joli
         let mut eigen_embedding = DMatrix::zeros(n, embedding_size);
 
-        self.manifold
-            .vertices
-            .iter()
-            .enumerate()
-            .for_each(|(i, x)| {
-                embedding_eigenvalues
-                    .iter()
-                    .for_each(|&(j, _)| eigen_embedding[(i, j)] = x[j])
-            });
+        (0..n).for_each(|i| {
+            embedding_eigenvectors
+                .iter()
+                .enumerate()
+                .for_each(|(j, v)| eigen_embedding[(i, j)] = v[i]);
+        });
 
         fn eigenvalue_transformation(equation: &SpectralPDE, l: &f64, time_step: &f64) -> f64 {
             match equation {
@@ -431,21 +501,28 @@ impl<'a> EDPMethod<'a> {
             .for_each(|(x_idx, _)| {
                 sources.iter().enumerate().for_each(|(idx, &y_idx)| {
                     let mut dist = 0.0;
-                    for i in 0..embedding_size {
-                        let point_dist = eigen_embedding[(x_idx, i)] - eigen_embedding[(y_idx, i)];
-                        let lambda_i_transform = eigenvalue_transformation(
-                            &equation,
-                            embedding_eigenvalues[i].1,
-                            &self.time_step,
-                        );
-                        dist += lambda_i_transform * point_dist.powi(2);
-                    }
-
+                    embedding_eigenvalues
+                        .iter()
+                        .enumerate()
+                        .for_each(|(i, (_, v))| {
+                            let point_dist =
+                                eigen_embedding[(x_idx, i)] - eigen_embedding[(y_idx, i)];
+                            let lambda_i_transform =
+                                eigenvalue_transformation(&equation, v, &self.time_step);
+                            dist += lambda_i_transform * point_dist.powi(2);
+                        });
                     distance_map[(x_idx, idx)] = dist;
                 });
             });
 
-        Err("pouet".to_string())
+        let mut distance_vec = DVector::zeros(n);
+        (0..n).for_each(|i| {
+            let distances = distance_map.row(i);
+            let max_dist = distances.fold(f64::MIN, |acc, u| if acc <= u { u } else { acc });
+            distance_vec[i] = max_dist;
+        });
+
+        Ok(distance_vec)
     }
 }
 
