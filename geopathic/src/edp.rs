@@ -3,6 +3,7 @@ use core::f64;
 use itertools::Itertools;
 use nalgebra::{DMatrix, DVector};
 use std::collections::HashMap;
+use std::fmt::Display;
 
 use crate::manifold::{Manifold, Point};
 use crate::sources::Sources;
@@ -214,6 +215,18 @@ pub enum SpectralPDE {
     CommuteTime,
     Biharmonic,
     Diffusion,
+}
+
+impl Display for SpectralPDE {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let display_string = match self {
+            SpectralPDE::Eigenmap => "Eigenmap".to_string(),
+            SpectralPDE::CommuteTime => "CommuteTime".to_string(),
+            SpectralPDE::Biharmonic => "Biharmonic".to_string(),
+            SpectralPDE::Diffusion => "Diffusion".to_string(),
+        };
+        write!(f, "{}", display_string)
+    }
 }
 
 pub struct EDPMethod<'a> {
@@ -524,6 +537,8 @@ impl<'a> EDPMethod<'a> {
 
         Ok(distance_vec)
     }
+
+    pub fn test_accuracy_spectral(&self) {}
 }
 
 #[cfg(test)]
