@@ -49,7 +49,7 @@ for i, method in enumerate(methods):
         method_data["relative embedding size"],
         method_data["relative error"],
         marker="o",
-        s=80,
+        s=40,
         label=method,
         color=colors[i],
         alpha=0.8

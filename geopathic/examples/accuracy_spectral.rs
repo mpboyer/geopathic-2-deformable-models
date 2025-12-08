@@ -124,7 +124,7 @@ fn main() {
         "cow-nonormals.obj",
         // too big
         // "xwings.obj",
-        // "screw.obj",
+        "screw.obj",
         "dragon.obj",
         "rabbit-head.obj",
         // "fantasy-piece.obj",
