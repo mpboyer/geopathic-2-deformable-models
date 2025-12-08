@@ -232,7 +232,7 @@ impl Display for SpectralPDE {
 pub struct EDPMethod<'a> {
     manifold: &'a Manifold,
     pub laplace: Laplacian,
-    time_step: f64,
+    pub time_step: f64,
 }
 impl<'a> EDPMethod<'a> {
     pub fn new(manifold: &'a Manifold) -> Self {
@@ -428,6 +428,7 @@ impl<'a> EDPMethod<'a> {
 
         Ok(transformed)
     }
+
     /// Compute the spectral distance passed as argument. Note that the equation is valid for all
     /// $x, y$ so we compute the distances to each of the sources and take the minimum.
     pub fn compute_distance_spectral<S: Into<Sources>>(
