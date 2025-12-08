@@ -126,7 +126,7 @@ fn main() {
         // "xwings.obj",
         // "screw.obj",
         "dragon.obj",
-        // "rabbit-head.obj",
+        "rabbit-head.obj",
         // "fantasy-piece.obj",
         // "ferrari.obj",
     ];
