@@ -9,7 +9,7 @@ import numpy as np
 rc("font", **{"family": "serif", "serif": ["Computer Modern"]})
 rc("text", usetex=True)
 
-data = pd.read_csv("benchmarks/csv/heat_benchmark_11:25_17:10:13.csv")
+data = pd.read_csv("benchmarks/csv/heat_benchmark_12:08_14:16:04.csv")
 
 plot = sns.relplot(
     height=3,
@@ -30,10 +30,10 @@ plt.yscale("log")
 x = np.log10(data["vertices"])
 y = np.log10(data["time"])
 slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
-x_fit = np.linspace(x.min(), x.max(), 100)
-y_fit = slope * x_fit + intercept
-plot.ax.plot(10**x_fit, 10**y_fit, color="tab:blue", label="Linear fit (log-log)")
-print(f"Slope: {slope}, Intercept: {intercept}, R-squared: {r_value**2}")
+# x_fit = np.linspace(x.min(), x.max(), 100)
+# y_fit = slope * x_fit + intercept
+# plot.ax.plot(10**x_fit, 10**y_fit, color="tab:blue", label="Linear fit (log-log)")
+# print(f"Slope: {slope}, Intercept: {intercept}, R-squared: {r_value**2}")
 
 data["source"] = data["source"].astype(str)
 data["model"] = data["model"].astype(str)

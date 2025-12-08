@@ -27,7 +27,7 @@ fn main() {
         "suzanne.obj",
         "teapot.obj",
         // weird propagation
-        //"cow-nonormals.obj",
+        "cow-nonormals.obj",
         // too big
         // "xwings.obj",
         //"screw.obj",

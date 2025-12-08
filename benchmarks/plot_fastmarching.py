@@ -9,7 +9,7 @@ import numpy as np
 rc("font", **{"family": "serif", "serif": ["Computer Modern"]})
 rc("text", usetex=True)
 
-data = pd.read_csv("benchmarks/csv/fastmarching_benchmark_11:25_17:23:21.csv")
+data = pd.read_csv("benchmarks/csv/fastmarching_benchmark_12:08_14:07:15.csv")
 
 plot = sns.relplot(
     height=3,
