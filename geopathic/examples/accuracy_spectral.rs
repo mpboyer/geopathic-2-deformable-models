@@ -89,15 +89,15 @@ fn compute_distance_with_k_eigenvectors(
     distance_vec
 }
 
-fn compute_relative_l2_error(dist_k: &DVector<f64>, dist_full: &DVector<f64>) -> f64 {
+fn compute_relative_l2_error(dist_k: &DVector<f64>, dist_full: &DVector<f64>) -> (f64, f64) {
     let diff = dist_k - dist_full;
     let error_norm = diff.norm();
     let full_norm = dist_full.norm();
 
     if full_norm > 1e-10 {
-        error_norm / full_norm
+        (error_norm, error_norm / full_norm)
     } else {
-        0.0
+        (0.0, 0.0)
     }
 }
 
@@ -124,11 +124,11 @@ fn main() {
         "cow-nonormals.obj",
         // too big
         // "xwings.obj",
-        "screw.obj",
+        // "screw.obj",
         "dragon.obj",
-        "rabbit-head.obj",
-        "fantasy-piece.obj",
-        "ferrari.obj",
+        // "rabbit-head.obj",
+        // "fantasy-piece.obj",
+        // "ferrari.obj",
     ];
     let model_paths: Vec<_> = model_paths
         .into_iter()
@@ -142,7 +142,11 @@ fn main() {
         timestamp
     ))
     .unwrap();
-    writeln!(file, "model,vertices,faces,method,dimension,source,time").unwrap();
+    writeln!(
+        file,
+        "model,vertices,faces,method,dimension,embedding size,relative embedding size,error,relative error"
+    )
+    .unwrap();
 
     for path in model_paths {
         print!("Computing {:?}", path.file_name().unwrap());
@@ -194,12 +198,12 @@ fn main() {
                     time_step,
                 );
 
-                let relative_error = compute_relative_l2_error(&dist_k, &dist_full);
+                let (error, relative_error) = compute_relative_l2_error(&dist_k, &dist_full);
 
                 // Log to CSV
                 writeln!(
                     file,
-                    "{},{},{},{},{},{},{:.6},{:.10}",
+                    "{},{},{},{},{},{},{:.6},{:.10},{:.10}",
                     path.file_name().unwrap().to_str().unwrap(),
                     n,
                     manifold.faces().len(),
@@ -207,14 +211,14 @@ fn main() {
                     source,
                     k,
                     k as f64 / n as f64,
+                    error,
                     relative_error,
                 )
                 .unwrap();
             }
 
-            print!(".");
             std::io::stdout().flush().unwrap();
-            println!("done.");
+            println!("\t{} done.", spectral_method);
         }
     }
 }
