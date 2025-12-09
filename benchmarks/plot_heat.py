@@ -29,11 +29,22 @@ plt.yscale("log")
 
 x = np.log10(data["vertices"])
 y = np.log10(data["time"])
+# only fit for models bigger than "sculpture"
+# x = x[data["vertices"] > 1000]
+# y = y[data["vertices"] > 1000]
 slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+
+vert_sculture = data[data["model"] == "sculpture.obj"]["vertices"].values[0]
+x_pw = np.log10(data["vertices"][data["vertices"] >= vert_sculture])
+y_pw = np.log10(data["time"][data["vertices"] >= vert_sculture])
+slope_pw, intercept_pw, r_value_pw, p_value_pw, std_err_pw = stats.linregress(x_pw, y_pw)
+print(f"Piecewise Slope: {slope_pw}, Intercept: {intercept_pw}, R-squared: {r_value_pw**2}")
 # x_fit = np.linspace(x.min(), x.max(), 100)
 # y_fit = slope * x_fit + intercept
-# plot.ax.plot(10**x_fit, 10**y_fit, color="tab:blue", label="Linear fit (log-log)")
 # print(f"Slope: {slope}, Intercept: {intercept}, R-squared: {r_value**2}")
+x = np.linspace(x_pw.min(), x_pw.max(), 100)
+y = slope_pw * x + intercept_pw
+plot.ax.plot(10**x, 10**y, color="tab:blue", label="Linear fit (log-log)")
 
 data["source"] = data["source"].astype(str)
 data["model"] = data["model"].astype(str)
