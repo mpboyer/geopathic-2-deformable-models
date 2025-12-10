@@ -34,7 +34,7 @@ grouped_data = (
 grouped_data.columns = ["method", "relative embedding size", "relative error", "n_models"]
 
 # Create the plot
-fig, ax = plt.subplots(figsize=(8, 5))
+fig, ax = plt.subplots(figsize=(6, 4))
 
 # Color palette for methods
 methods = grouped_data["method"].unique()
@@ -49,7 +49,7 @@ for i, method in enumerate(methods):
         method_data["relative embedding size"],
         method_data["relative error"],
         marker="o",
-        s=40,
+        s=10,
         label=method,
         color=colors[i],
         alpha=0.8
