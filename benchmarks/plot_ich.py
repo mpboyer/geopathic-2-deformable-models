@@ -13,7 +13,7 @@ data = pd.read_csv("benchmarks/csv/ich_benchmark_11:18_20:08:45.csv")
 
 plot = sns.relplot(
     height=3,
-    aspect=1,
+    aspect=1.5,
     data=data,
     x="vertices",
     y="time",

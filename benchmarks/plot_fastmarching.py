@@ -13,7 +13,7 @@ data = pd.read_csv("benchmarks/csv/fastmarching_benchmark_12:08_14:07:15.csv")
 
 plot = sns.relplot(
     height=3,
-    aspect=1,
+    aspect=1.5,
     data=data,
     x="vertices",
     y="time",
