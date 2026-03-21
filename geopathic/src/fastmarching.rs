@@ -29,6 +29,7 @@ impl PartialEq for TrialVertex {
 
 impl Eq for TrialVertex {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for TrialVertex {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         other.distance.partial_cmp(&self.distance) // Order is reversed because we use min-heap

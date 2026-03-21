@@ -44,7 +44,7 @@ enum VertexState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-enum StencilUpdateMethod {
+pub enum StencilUpdateMethod {
     #[default]
     Mesh,
     Ell1(f64),
@@ -91,7 +91,7 @@ enum Interpolant {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-enum MinimizationProblemMethod {
+pub enum MinimizationProblemMethod {
     #[default]
     FermatIntegral,
     EikonalEquation,
@@ -100,14 +100,14 @@ enum MinimizationProblemMethod {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-enum InterpolantRepresentation {
+pub enum InterpolantRepresentation {
     #[default]
     Cubic,
     Graph,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-struct AlgorithmicParameters {
+pub struct AlgorithmicParameters {
     stencil_update: StencilUpdateMethod,
     minimization_problem: MinimizationProblemMethod,
     interpolant_representation: InterpolantRepresentation,
@@ -135,6 +135,7 @@ impl PartialEq for TrialVertex {
 
 impl Eq for TrialVertex {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for TrialVertex {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         other.jet.distance.partial_cmp(&self.jet.distance) // Order is reversed because we use min-heap
@@ -258,6 +259,20 @@ impl<'a, Sl: SlownessModel> JetMarching<'a, Sl> {
         }
     }
 
+    pub fn with_stencil(mut self, method: StencilUpdateMethod) -> Self {
+        self.params.stencil_update = method;
+        self
+    }
+
+    pub fn with_minimization(mut self, method: MinimizationProblemMethod) -> Self {
+        self.params.minimization_problem = method;
+        self
+    }
+
+    pub fn with_interpolant(mut self, repr: InterpolantRepresentation) -> Self {
+        self.params.interpolant_representation = repr;
+        self
+    }
     fn get_neighbours(&self, v_idx: usize) -> Vec<usize> {
         let mut neighbours = Vec::new();
         for &f_idx in &self.vertex_to_faces[v_idx] {
