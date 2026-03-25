@@ -293,9 +293,9 @@ fn main() {
         "teapot.obj",
         "cow-nonormals.obj",
         "dragon.obj",
-        "alligator.obj",
-        "screw.obj",
-        "rabbit-head.obj",
+        // "alligator.obj",
+        // "screw.obj",
+        // "rabbit-head.obj",
     ];
     let mut model_paths: Vec<_> = std::fs::read_dir("../examples/models/")
         .expect("Could not read models directory")
