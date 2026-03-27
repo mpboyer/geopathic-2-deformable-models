@@ -4,7 +4,7 @@ use geopathic::colormaps::{distance_colormap, iso_distances};
 use geopathic::edp::{EDPMethod, Poiffon, SpectralPDE};
 use geopathic::fastmarching::FastMarching;
 use geopathic::ich::ICH;
-use geopathic::jetmarching::{GraphCurveParams, JetMarching};
+use geopathic::jetmarching::JetMarching;
 use geopathic::loader::load_manifold;
 use geopathic::mesh::Mesh;
 use geopathic::viewer::Viewer;
@@ -69,16 +69,15 @@ fn fast_marching() {
 
 #[allow(dead_code)]
 fn jet_marching() {
-    let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
+    let manifold = load_manifold("../examples/spheres/sphere_40962.obj").unwrap();
     let s = |_: &DVector<f64>| -> f64 { 1.0 };
     let jetmarching = JetMarching::new(&manifold, s);
-    let sources = [0, 256];
+    let sources = [0];
     let (distances, _) = match jetmarching.compute_distance(sources) {
         Ok(it) => it,
         Err(err) => panic!("{}", err),
     };
     let colormap = Some(distance_colormap(&manifold, &distances, false));
-
     let mut viewer = Viewer::new();
     viewer.add_manifold(&manifold, colormap);
     // viewer.plot_curves(iso_distances(&manifold, &distances, 1.0));

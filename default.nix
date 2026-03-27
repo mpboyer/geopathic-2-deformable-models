@@ -1,6 +1,10 @@
 {
   sources ? import ./lon.nix,
-  pkgs ? import sources.nixpkgs { overlays = [ (import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz")) ]; },
+  pkgs ? import sources.nixpkgs {
+    overlays = [
+      (import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz"))
+    ];
+  },
 }:
 
 let
@@ -17,10 +21,10 @@ in
       wayland
 
       # WINIT_UNIX_BACKEND=x11
-      xorg.libXcursor
-      xorg.libXrandr
-      xorg.libXi
-      xorg.libX11
+      libXcursor
+      libXrandr
+      libXi
+      libX11
     ];
     LD_LIBRARY_PATH = "${lib.makeLibraryPath buildInputs}";
     WINIT_UNIX_BACKEND = "x11";
