@@ -25,13 +25,17 @@ print(f"Data points after filtering: {len(filtered_data)}")
 # Group by method and relative embedding size, then average
 grouped_data = (
     filtered_data.groupby(["method", "relative embedding size"])
-    .agg({
-        "relative error": "mean",
-        "model": "count"  # Count number of models averaged
-    })
+    .agg(
+        {"relative error": "mean", "model": "count"}  # Count number of models averaged
+    )
     .reset_index()
 )
-grouped_data.columns = ["method", "relative embedding size", "relative error", "n_models"]
+grouped_data.columns = [
+    "method",
+    "relative embedding size",
+    "relative error",
+    "n_models",
+]
 
 # Create the plot
 fig, ax = plt.subplots(figsize=(6, 3.3))
@@ -42,8 +46,10 @@ colors = sns.color_palette("husl", len(methods))
 
 # Plot each method
 for i, method in enumerate(methods):
-    method_data = grouped_data[grouped_data["method"] == method].sort_values("relative embedding size")
-    
+    method_data = grouped_data[grouped_data["method"] == method].sort_values(
+        "relative embedding size"
+    )
+
     # Plot the average curve with markers
     ax.scatter(
         method_data["relative embedding size"],
@@ -52,7 +58,7 @@ for i, method in enumerate(methods):
         s=10,
         label=method,
         color=colors[i],
-        alpha=0.8
+        alpha=0.8,
     )
 
 ax.set_xlabel("Relative Size of the Eigenvalue Embedding", fontsize=12)

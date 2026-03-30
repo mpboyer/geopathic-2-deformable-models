@@ -12,46 +12,47 @@ CSV = "benchmarks/csv/comparison_benchmark_03:21_17:11:30.csv"
 data = pd.read_csv(CSV)
 
 MIN_SHORT = {
-    "FermatIntegral":   "Fermat",
-    "EikonalEquation":  "Eikonal",
-    "CellBasedMarching":"Cell",
-    "QuadraticCurve":   "Quad",
+    "FermatIntegral": "Fermat",
+    "EikonalEquation": "Eikonal",
+    "CellBasedMarching": "Cell",
+    "QuadraticCurve": "Quad",
 }
 STENCIL_SHORT = {
-    "Mesh":        "Mesh",
-    "Ell1(0.5)":   r"$\ell_1(0.5)$",
-    "Ell1(2)":     r"$\ell_1(2)$",
+    "Mesh": "Mesh",
+    "Ell1(0.5)": r"$\ell_1(0.5)$",
+    "Ell1(2)": r"$\ell_1(2)$",
     "MeshEll1(0.5)": r"M+$\ell_1(0.5)$",
-    "MeshEll1(2)":   r"M+$\ell_1(2)$",
+    "MeshEll1(2)": r"M+$\ell_1(2)$",
 }
 
 data["stencil_s"] = data["stencil"].map(STENCIL_SHORT).fillna(data["stencil"])
-data["min_s"]     = data["minimization"].map(MIN_SHORT).fillna(data["minimization"])
-data["interp_s"]  = data["interpolant"].str[0]   # C or G
+data["min_s"] = data["minimization"].map(MIN_SHORT).fillna(data["minimization"])
+data["interp_s"] = data["interpolant"].str[0]  # C or G
 
 data["variant"] = data["stencil_s"] + "/" + data["min_s"] + "/" + data["interp_s"]
 
 slowness_fields = ["constant_1", "constant_2", "linear_x", "radial", "pervertex_random"]
 SLOWNESS_LABELS = {
-    "constant_1":       r"const(1)",
-    "constant_2":       r"const(2)",
-    "linear_x":         r"lin-$x$",
-    "radial":           r"radial",
+    "constant_1": r"const(1)",
+    "constant_2": r"const(2)",
+    "linear_x": r"lin-$x$",
+    "radial": r"radial",
     "pervertex_random": r"random",
 }
 
 metrics = ["mae_vs_fm", "max_err_vs_fm"]
 METRIC_LABELS = {
-    "mae_vs_fm":     r"MAE vs FM",
+    "mae_vs_fm": r"MAE vs FM",
     "max_err_vs_fm": r"Max error vs FM",
 }
 
 variants_ordered = sorted(data["variant"].unique())
 
 n_slow = len(slowness_fields)
-n_met  = len(metrics)
+n_met = len(metrics)
 fig, axes = plt.subplots(
-    n_met, n_slow,
+    n_met,
+    n_slow,
     figsize=(3.2 * n_slow, 3.5 * n_met),
     sharey="row",
 )
@@ -102,7 +103,9 @@ for row, metric in enumerate(metrics):
         else:
             ax.set_xticks([])
 
-fig.suptitle(r"\textbf{JetMarching accuracy vs FastMarching reference}", fontsize=11, y=1.01)
+fig.suptitle(
+    r"\textbf{JetMarching accuracy vs FastMarching reference}", fontsize=11, y=1.01
+)
 fig.tight_layout()
 fig.savefig("benchmarks/pdf/plot2_accuracy_comparison.pdf", bbox_inches="tight")
 plt.close()

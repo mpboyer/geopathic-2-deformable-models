@@ -4,6 +4,7 @@ from matplotlib import rc
 import seaborn as sns
 import scipy.stats as stats
 import numpy as np
+
 # from adjustText import adjust_text
 
 rc("font", **{"family": "serif", "serif": ["Computer Modern"]})
@@ -37,8 +38,12 @@ slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
 vert_sculture = data[data["model"] == "sculpture.obj"]["vertices"].values[0]
 x_pw = np.log10(data["vertices"][data["vertices"] >= vert_sculture])
 y_pw = np.log10(data["time"][data["vertices"] >= vert_sculture])
-slope_pw, intercept_pw, r_value_pw, p_value_pw, std_err_pw = stats.linregress(x_pw, y_pw)
-print(f"Piecewise Slope: {slope_pw}, Intercept: {intercept_pw}, R-squared: {r_value_pw**2}")
+slope_pw, intercept_pw, r_value_pw, p_value_pw, std_err_pw = stats.linregress(
+    x_pw, y_pw
+)
+print(
+    f"Piecewise Slope: {slope_pw}, Intercept: {intercept_pw}, R-squared: {r_value_pw**2}"
+)
 # x_fit = np.linspace(x.min(), x.max(), 100)
 # y_fit = slope * x_fit + intercept
 # print(f"Slope: {slope}, Intercept: {intercept}, R-squared: {r_value**2}")
