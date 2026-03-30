@@ -296,7 +296,7 @@ impl<'a, Sl: SlownessModel> JetMarching<'a, Sl> {
     pub fn compute_distance<S: Into<Sources>>(
         &self,
         sources: S,
-    ) -> Result<(DVector<f64>, DVector<f64>), String> {
+    ) -> Result<(DVector<f64>, DVector<f64>, Vec<Jet>), String> {
         let sources = sources.into();
         self.compute_distance_impl(&sources.0)
     }
@@ -304,7 +304,7 @@ impl<'a, Sl: SlownessModel> JetMarching<'a, Sl> {
     pub fn compute_distance_impl(
         &self,
         sources: &[usize],
-    ) -> Result<(DVector<f64>, DVector<f64>), String> {
+    ) -> Result<(DVector<f64>, DVector<f64>, Vec<Jet>), String> {
         let n = self.manifold.vertices().len();
         let dim = 3;
 
@@ -380,7 +380,7 @@ impl<'a, Sl: SlownessModel> JetMarching<'a, Sl> {
 
         let amplitudes = DVector::from_vec(jets.iter().map(|j| j.amplitude).collect());
 
-        Ok((distances, amplitudes))
+        Ok((distances, amplitudes, jets))
     }
 
     /// Initialize a direct neighbour of the source with edge distance
@@ -1078,7 +1078,7 @@ mod jettests {
         let result = marching.compute_distance(vec![0]);
         assert!(result.is_ok());
 
-        let (distances, _amplitudes) = result.unwrap();
+        let (distances, _amplitudes, _jets) = result.unwrap();
 
         assert_eq!(distances[0], 0.0);
         assert!((distances[1] - 1.0).abs() < 1e-8);
@@ -1156,7 +1156,7 @@ mod jettests {
         let manifold = Manifold::new(vertices, faces);
         let fm = JetMarching::new(&manifold, slowness);
 
-        let (distances, _amplitudes) = fm.compute_distance(0).unwrap();
+        let (distances, _amplitudes, _jets) = fm.compute_distance(0).unwrap();
 
         assert!(distances[0].abs() < 1e-6, "Source distance should be 0");
 
@@ -1192,7 +1192,7 @@ mod jettests {
         let manifold = Manifold::new(vertices, faces);
         let fm = JetMarching::new(&manifold, slowness);
 
-        let (distances, _amplitudes) = fm.compute_distance(0).unwrap();
+        let (distances, _amplitudes, _jets) = fm.compute_distance(0).unwrap();
 
         assert!(distances[0].abs() < 1e-6);
         assert!((distances[1] - 1.0).abs() < 1e-6);
@@ -1215,7 +1215,7 @@ mod jettests {
         let manifold = Manifold::new(vertices, faces);
         let fm = JetMarching::new(&manifold, slowness);
 
-        let (dist_from_0, _amplitudes) = fm.compute_distance(0).unwrap();
+        let (dist_from_0, _amplitudes, _jets) = fm.compute_distance(0).unwrap();
         let avg_dist = (dist_from_0[1] + dist_from_0[2] + dist_from_0[3]) / 3.0;
 
         for i in 1..4 {
@@ -1230,7 +1230,7 @@ mod jettests {
 
         // On définit 0 et 2 comme sources
         let result = marching.compute_distance(vec![0, 2]);
-        let (distances, _) = result.unwrap();
+        let (distances, _, _) = result.unwrap();
 
         // Les sources DOIVENT être à 0.0
         assert!(
@@ -1266,7 +1266,7 @@ mod jettests {
         let manifold = setup_minimal_manifold(); // Carré [0,1]x[0,1]
         let marching = JetMarching::new(&manifold, LinearSlowness);
 
-        let (distances, _) = marching.compute_distance(0).unwrap();
+        let (distances, _, _) = marching.compute_distance(0).unwrap();
 
         // Au sommet (1,0), la distance analytique pour s(x)=1+x est ln(1+x) si on intègre
         // Mais ici c'est plus complexe. On vérifie surtout que la distance est cohérente
@@ -1299,7 +1299,7 @@ mod jettests {
         let manifold = Manifold::new(vertices, faces);
         let marching = JetMarching::new(&manifold, ConstantSlowness(1.0));
 
-        let (distances, _) = marching.compute_distance(0).unwrap();
+        let (distances, _, _) = marching.compute_distance(0).unwrap();
 
         // Le point le plus éloigné est (9,9), distance attendue: sqrt(9^2 + 9^2) = 12.72
         let far_idx = n * n - 1;
@@ -1318,7 +1318,7 @@ mod jettests {
         let manifold = setup_minimal_manifold();
         let marching = JetMarching::new(&manifold, LinearSlowness);
 
-        let (distances, _) = marching.compute_distance(0).unwrap();
+        let (distances, _, _) = marching.compute_distance(0).unwrap();
 
         // s(x) = 1 + x. Au point (1,0), la distance analytique en ligne droite
         // est l'intégrale de 0 à 1 de (1+x)dx = [x + x^2/2] = 1.5.
@@ -1341,7 +1341,7 @@ mod jettests {
         let manifold = Manifold::new(vertices, faces);
         let marching = JetMarching::new(&manifold, ConstantSlowness(1.0));
 
-        let (_, amplitudes) = marching.compute_distance(0).unwrap();
+        let (_, amplitudes, _) = marching.compute_distance(0).unwrap();
 
         // Au lieu de tester la décroissance stricte qui peut échouer à cause de
         // l'initialisation, on vérifie que l'amplitude reste finie et positive.
@@ -1356,7 +1356,7 @@ mod jettests {
 
         // Sommets 0 et 1 comme sources (distance 1.0 entre eux)
         let result = marching.compute_distance(vec![0, 1]);
-        let (distances, _) = result.unwrap();
+        let (distances, _, _) = result.unwrap();
 
         assert_eq!(distances[0], 0.0);
         assert_eq!(distances[1], 0.0);

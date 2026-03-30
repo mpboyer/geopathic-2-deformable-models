@@ -344,20 +344,114 @@ sommet $x_{1}$ est fixé par les mises à jour d'arête vers $\hat{x}$:
 \end{enumerate}
 
 \subsection{Résultats}
+Dans cette section je présente rapidement quelques graphes montrant la différence de complexité temporelle
+et de précision entre les différentes méthodes de Jet Marching et le Fast Marching.
+Les expériences menées l'ont été sur le même ordinateur, sous Rust version \texttt{1.95.0-beta.5},
+sans utiliser de carte graphique.
+
+
+\paragraph*{Efficacité Générale}
+Les modèles 3D utilisés comme $2$-variétés sont disponibles dans le dépôt Git.
+On présente dans les figures ci-dessous les vitesses d'exécution, moyennées sur 10 relances, du fast
+marching (à gauche) et du jet marching sur des variétés de différentes tailles, en échelle log-log.
+
+\begin{figure}[htbp]
+	\centering
+	\begin{minipage}{0.48\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{../benchmarks/pdf/fastmarching_benchmark.pdf}
+		\caption{Fast Marching : Temps d'exécution en fonction du nombre de sommets $N$.}
+	\end{minipage}
+	\hfill
+	\begin{minipage}{0.48\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{../benchmarks/pdf/jetmarching_benchmark.pdf}
+		\caption{Jet Marching : Temps d'exécution en fonction du nombre de sommets $N$.}
+	\end{minipage}
+\end{figure}
+
+On observe notamment que la complexité algorithmique des deux méthodes est bien, comme attendu en théorie,
+de l'ordre de $N\log N$, et que, comme attendu, le Jet Marching est plus lent que le Fast Marching puisque
+chaque étape de calcul prend un temps constant plus grand.
+En particulier, la pente des droites modèles étant similaire, il s'agit effectivement d'une accélération
+constante lorsque l'entrée est grande.
+
+\paragraph*{Comparaison Spécifique}
+Pour pouvoir étudier la vitesse de convergence et la précision des méthodes, on considère une familles de
+maillages d'une même variété.
+On s'intéresse ici au problème de calculer les solutions de l'Eikonale, partant du pôle
+nord de la $2$-sphère.
+Autrement dit, on a $\Omega = \S^{2}$ et $\Gamma = \{(0, 0, 0)\}$ (la sphère étant translatée pour avoir
+$\Gamma \subseteq \Omega$).
+
+La discrétisation est effectuée itérativement à partir d'un icosahèdre circonsrit à la sphère: on divise
+chaque face en quatre, on projette les points sur $\S^{2}$ et on répète le processus.
+On obtient ainsi une famille de maillages $\Omega_{h}$ de plus en plus précis de la sphère.
+
+La figure \ref{fig:error_conv} illustre la réduction de l'erreur $\norm{\cdot}_{\infty}$ par rapport à la
+taille caractéristique du maillage $h$.
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../benchmarks/pdf/sphere_maxerr_convergence.pdf}
+	\caption{Évolution de l'erreur numérique en fonction de la résolution du maillage ($h$).}
+	\label{fig:error_conv}
+\end{figure}
+
+Conformément à l'étude théorique, nous observons que le \textit{Jet Marching} atteint une précision plus
+grande que le Fast Marching lorsque le maillage devient suffisamment précis.
+On voit par ailleurs que la meilleure méthode de Jet Marching atteint une précision en $\O(h^{\alpha})$ avec
+$\alpha \in ]1, 2[$.
+On présente dans la Figure \ref{fig:heatconv} les ordres de grandeurs empiriques pour les vitesses de
+convergence des différentes méthodes.
+Le fait qu'on n'obtienne pas une précision aussi bonne qu'en théorie peut venir de deux facteurs:
+\begin{enumerate}
+	\item l'implémentation numérique de la résolution locale de l'Équation de Fermat;
+	\item le fait que l'erreur absolue soit déduite du maillage: on ne compare pas l'erreur de calcul à
+	      la distance induite par le maillage mais à la distance absolue calculable sur la $2$-sphère.
+\end{enumerate}
 
 \begin{figure}
 	\begin{center}
-		\includegraphics[width=0.95\textwidth]{../benchmarks/pdf/fastmarching_benchmark.pdf}
-
+		\includegraphics[width=0.95\textwidth]{../benchmarks/pdf/sphere_order_heatmap.pdf}
 	\end{center}
-	\begin{center}
-		\includegraphics[width=0.95\textwidth]{../benchmarks/pdf/jetmarching_benchmark.pdf}
-
-	\end{center}
-
-	\caption{Comparison of Fast Marching and Jet Marching Algorithmic Complexity, log-log plots}\label{fig:comp}
+	\caption{Estimation des ordres de grandeur de convergence pour les différentes méthodes}\label{fig:heatconv}
 \end{figure}
-Dans la Figure \ref{fig:comp} on présente une comparaison de la vitesse (expérimentale)
+On observe cependant que les meilleures méthodes sont effectivement du Jet Marching et non pas du
+Fast Marching, et qu'elles sont pour majorité basées sur la méthode de propagation de valeurs entre
+cellules, en utilisant le maillage comme base.
+
+Bien que le coût par sommet soit plus élevé en raison de la résolution locale du problème de minimisation
+de Fermat, la complexité globale reste proche du $O(N \log N)$.
+La figure \ref{fig:bench_time} compare le temps d'exécution total plus précisément dans le cadre des
+différentes triangulations de la sphère.
+On remarque notamment en combinant les Figures \ref{fig:bench_time} et \ref{fig:error_conv}
+que pour une précision cible donnée, le \textit{Jet Marching}
+peut s'avérer plus efficace en permettant l'usage de maillages plus grossiers.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../benchmarks/pdf/sphere_time_complexity.pdf}
+	\caption{Comparaison du temps d'exécution entre Fast Marching et Jet Marching.}
+	\label{fig:bench_time}
+\end{figure}
+
+La figure \ref{fig:visualisation} montre le front de propagation et le champ de gradients calculés
+sur une 2-variété complexe.
+On vérifie bien que les gradients calculés ont une direction raisonnable par rapport au champ de distance
+affiché, même si le maillage reste grossier.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=.5\textwidth]{teddy.png}
+	\caption{Visualisation de l'eikonale et des gradients sur un maillage triangulaire.}
+	\label{fig:visualisation}
+\end{figure}
+
+\paragraph*{Conclusion}
+Dans l'implémentation proposée ici, nous retrouvons effectivement le fait que les méthodes de Jet Marching
+semblent être plus précises que les méthodes de Fast Marching lorsque le maillage devient plus précis,
+et ce pour un surcoût en temps de calcul qui reste faible.
+
 
 \bibliographystyle{alpha}
 \bibliography{report}

@@ -178,6 +178,71 @@ impl Viewer {
         }
     }
 
+    pub fn draw_arrow(
+        &mut self,
+        origin: &Point,
+        target: &Point,
+        scale: Option<f32>,
+        color: Option<Point3<f32>>,
+    ) {
+        let s = scale.unwrap_or(1.0);
+
+        // 1. Marquer l'origine avec la sphère de draw_point
+        // Puisque Point est un DVector<f64>, l'appel est direct
+        self.draw_point(origin.clone(), scale, color);
+
+        // 2. Préparation des coordonnées en f32 pour Kiss3D
+        let p0 = Vector3::new(origin[0] as f32, origin[1] as f32, origin[2] as f32);
+        let p1 = Vector3::new(target[0] as f32, target[1] as f32, target[2] as f32);
+
+        let dir = p1 - p0;
+        let len = dir.norm();
+
+        // Sécurité pour éviter une division par zéro sur la normalisation
+        if len < 1e-6 {
+            return;
+        }
+        let dir_norm = dir / len;
+
+        // 3. Paramétrage de la flèche
+        let head_len = 0.1 * s;
+        let head_radius = 0.025 * s;
+        let body_radius = 0.008 * s;
+        let body_len = (len - head_len).max(0.0);
+
+        let (r, g, b) = match color {
+            Some(c) => (c[0], c[1], c[2]),
+            None => (0.0, 0.0, 1.0), // Bleu par défaut
+        };
+
+        // 4. Construction du corps (Cylindre)
+        let mut body = self.window.add_cylinder(body_radius, body_len);
+        body.set_color(r, g, b);
+
+        // Le centre du cylindre est positionné à p0 + la moitié de sa longueur
+        let body_pos = p0 + dir_norm * (body_len / 2.0);
+        body.set_local_translation(na::Translation3::from(body_pos));
+
+        // 5. Construction de la tête (Cône)
+        let mut head = self.window.add_cone(head_radius, head_len);
+        head.set_color(r, g, b);
+
+        // Le centre du cône est à la fin du corps + la moitié de la hauteur du cône
+        let head_pos = p0 + dir_norm * (body_len + head_len / 2.0);
+        head.set_local_translation(na::Translation3::from(head_pos));
+
+        // 6. Orientation
+        // Kiss3d crée les primitives alignées sur l'axe Y. On tourne vers dir_norm.
+        let rotation = UnitQuaternion::rotation_between(&Vector3::y(), &dir_norm)
+            .unwrap_or(UnitQuaternion::identity());
+
+        body.set_local_rotation(rotation);
+        head.set_local_rotation(rotation);
+
+        // 7. Enregistrement des nœuds
+        self.nodes.push(body);
+        self.nodes.push(head);
+    }
     pub fn draw_point(&mut self, point: Point, scale: Option<f32>, color: Option<Point3<f32>>) {
         // set the color (argument of default)
         let (r, g, b) = match color {

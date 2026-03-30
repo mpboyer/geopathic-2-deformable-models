@@ -69,21 +69,31 @@ fn fast_marching() {
 
 #[allow(dead_code)]
 fn jet_marching() {
-    let manifold = load_manifold("../examples/spheres/sphere_40962.obj").unwrap();
+    let manifold = load_manifold("../examples/models/teddy.obj").unwrap();
     let s = |_: &DVector<f64>| -> f64 { 1.0 };
     let jetmarching = JetMarching::new(&manifold, s);
     let sources = [0];
-    let (distances, _) = match jetmarching.compute_distance(sources) {
+    let (distances, _, jets) = match jetmarching.compute_distance(sources) {
         Ok(it) => it,
         Err(err) => panic!("{}", err),
     };
     let colormap = Some(distance_colormap(&manifold, &distances, false));
     let mut viewer = Viewer::new();
+    viewer.white_background();
     viewer.add_manifold(&manifold, colormap);
-    // viewer.plot_curves(iso_distances(&manifold, &distances, 1.0));
 
-    viewer.plot_sources(&manifold, sources, None, None);
-    viewer.render(true);
+    #[allow(clippy::needless_range_loop)]
+    for dest in 1..manifold.vertices().len() {
+        if distances[dest].is_infinite() {
+            continue;
+        }
+        let source = &manifold.vertices()[dest];
+        let target = source + jets[dest].gradient.clone();
+        viewer.draw_arrow(source, &target, Some(10.0), None);
+    }
+
+    println!("Rendering...");
+    viewer.render(false);
 }
 
 #[allow(dead_code)]
